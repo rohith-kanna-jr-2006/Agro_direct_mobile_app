@@ -4,6 +4,7 @@ const cors = require('cors');
 const Product = require('./models/Product');
 const Order = require('./models/Order');
 const Profile = require('./models/Profile');
+const User = require('./models/User');
 
 const app = express();
 const PORT = 5000;
@@ -15,6 +16,49 @@ app.use(express.json());
 mongoose.connect('mongodb://127.0.0.1:27017/kisansmartapp')
     .then(() => console.log('MongoDB Connected'))
     .catch(err => console.error(err));
+
+// --- Users ---
+app.post('/api/users/register', async (req, res) => {
+    try {
+        const { email, phone, username, password, location, keywords, name, age } = req.body;
+
+        // Simple validation
+        if (!email || !password || !username) {
+            return res.status(400).json({ error: "Email, Username, and Password are required" });
+        }
+
+        const newUser = new User({ email, phone, username, password, location, keywords, name, age });
+        const savedUser = await newUser.save();
+        res.status(201).json(savedUser);
+    } catch (err) {
+        if (err.code === 11000) {
+            res.status(400).json({ error: "User with this email, phone, or username already exists" });
+        } else {
+            res.status(500).json({ error: err.message });
+        }
+    }
+});
+
+app.post('/api/users/login', async (req, res) => {
+    try {
+        const { identifier, password } = req.body;
+        // Find by email OR phone OR username
+        const user = await User.findOne({
+            $or: [{ email: identifier }, { phone: identifier }, { username: identifier }]
+        });
+
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        if (user.password !== password) { // In production, use bcrypt!
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // --- Products ---
 app.get('/api/products', async (req, res) => {

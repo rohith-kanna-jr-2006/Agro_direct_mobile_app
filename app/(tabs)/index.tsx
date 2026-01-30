@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { maybeCompleteAuthSession } from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri } from 'expo-auth-session';
 import { TRANSLATIONS } from '@/constants/translations';
 import { scheduleNotification } from '@/utils/notifications';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
+import { useRouter } from 'expo-router';
+import { maybeCompleteAuthSession } from 'expo-web-browser';
+import React, { useEffect, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const THEME_COLOR = '#4CAF50';
 const BACKGROUND_COLOR = '#F5F5F5';
@@ -61,6 +61,8 @@ export default function HomeScreen() {
         setRole(user.role);
         setUserInfo(user);
         setStep('home');
+      } else {
+        router.replace('/signup/language');
       }
     } catch (e) {
       console.error(e);
@@ -69,8 +71,8 @@ export default function HomeScreen() {
 
   const logout = async () => {
     await AsyncStorage.removeItem('current_user');
-    setStep('auth');
     setUserInfo(null);
+    router.replace('/signup/language');
   };
 
   const handleForgotPassword = async () => {
@@ -385,15 +387,15 @@ export default function HomeScreen() {
         <Text style={styles.headerTitle}>{t.appName}</Text>
         <Text style={styles.headerSubtitle}>{role === 'farmer' ? t.farmer : t.buyer} - {userInfo?.name || t.welcome}</Text>
 
-        <TouchableOpacity onPress={switchAccount} style={{ position: 'absolute', top: 50, left: 20 }}>
+        <TouchableOpacity onPress={switchAccount} style={{ position: 'absolute', top: 50, left: 20, zIndex: 10 }}>
           <Ionicons name="swap-horizontal" size={24} color="white" />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={logout} style={{ position: 'absolute', top: 50, right: 60 }}>
+        <TouchableOpacity onPress={logout} style={{ position: 'absolute', top: 50, right: 60, zIndex: 10 }}>
           <Ionicons name="log-out-outline" size={24} color="white" />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setStep('lang')} style={styles.langSwitch}>
+        <TouchableOpacity onPress={() => setStep('lang')} style={[styles.langSwitch, { zIndex: 10 }]}>
           <Ionicons name="language" size={20} color="white" />
         </TouchableOpacity>
       </View>

@@ -1,8 +1,23 @@
 import { Platform } from 'react-native';
 
-// Use 10.0.2.2 for Android Emulator, localhost for iOS/Web.
-// For physical device, replace with your machine's local IP (e.g., http://192.168.1.X:5000/api)
-const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+import Constants from 'expo-constants';
+
+// Automatically detect the backend URL based on where the app is running
+const getApiUrl = () => {
+    // If running in Expo Go or Build, this gives the IP of the machine running Metro
+    const debuggerHost = Constants.expoConfig?.hostUri;
+    const localhost = debuggerHost?.split(':')[0];
+
+    if (localhost) {
+        return `http://${localhost}:5000/api`;
+    }
+
+    // Fallback for Android Emulator (10.0.2.2) or iOS Simulator/Web (localhost)
+    return Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+}
+
+const API_URL = getApiUrl();
+console.log("Using API URL:", API_URL);
 
 export const fetchProducts = async () => {
     try {

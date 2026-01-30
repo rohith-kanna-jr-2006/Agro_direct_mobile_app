@@ -1,0 +1,15 @@
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema({
+    email: { type: String, required: true, unique: true },
+    phone: { type: String, required: true },
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    location: { type: String },
+    keywords: [{ type: String }], // identifying "keyword's" as an array of tags/interests
+    name: { type: String },
+    age: { type: Number },
+    createdAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('User', userSchema);
