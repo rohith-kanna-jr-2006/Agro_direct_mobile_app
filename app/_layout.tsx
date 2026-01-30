@@ -3,7 +3,9 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import { useEffect } from 'react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { registerForPushNotificationsAsync } from '@/utils/notifications';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -11,6 +13,12 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    registerForPushNotificationsAsync().then(token => {
+      if (token) console.log("Push Token:", token);
+    });
+  }, []);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
