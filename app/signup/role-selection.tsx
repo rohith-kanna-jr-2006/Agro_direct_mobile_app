@@ -1,3 +1,4 @@
+import { useLanguage } from '@/hooks/useLanguage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -7,6 +8,7 @@ const { width } = Dimensions.get('window');
 
 export default function RoleSelection() {
     const router = useRouter();
+    const { t } = useLanguage();
 
     const handleRoleSelect = async (role: string, subRole?: string) => {
         await AsyncStorage.setItem('user_role', role);
@@ -34,8 +36,8 @@ export default function RoleSelection() {
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Who are you?</Text>
-                <Text style={styles.headerSubtitle}>Choose the profile that fits you best</Text>
+                <Text style={styles.headerTitle}>{t.whoAreYou}</Text>
+                <Text style={styles.headerSubtitle}>{t.chooseProfile}</Text>
             </View>
 
             {/* Farmer Section - Featured */}
@@ -45,10 +47,10 @@ export default function RoleSelection() {
                 activeOpacity={0.8}
             >
                 <View style={styles.farmerInfo}>
-                    <Text style={styles.farmerTitle}>I am a Farmer</Text>
-                    <Text style={styles.farmerSubtitle}>Sell your produce directly to buyers.</Text>
+                    <Text style={styles.farmerTitle}>{t.iamFarmer}</Text>
+                    <Text style={styles.farmerSubtitle}>{t.sellProduce}</Text>
                     <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Start Selling</Text>
+                        <Text style={styles.badgeText}>{t.startSelling}</Text>
                     </View>
                 </View>
                 <Image
@@ -57,33 +59,33 @@ export default function RoleSelection() {
                 />
             </TouchableOpacity>
 
-            <Text style={styles.sectionTitle}>I want to Buy...</Text>
+            <Text style={styles.sectionTitle}>{t.wantToBuy}</Text>
 
             <View style={styles.grid}>
                 <RoleCard
-                    title="Household"
-                    desc="For Home"
+                    title={t.household}
+                    desc={t.forHome}
                     iconUri="https://img.icons8.com/color/96/home.png"
                     onPress={() => handleRoleSelect('buyer', 'consumer')}
                     color="#E3F2FD"
                 />
                 <RoleCard
-                    title="Retailer"
-                    desc="Shop Owner"
+                    title={t.retailer}
+                    desc={t.shopOwner}
                     iconUri="https://img.icons8.com/color/96/shop.png"
                     onPress={() => handleRoleSelect('buyer', 'retailer')}
                     color="#E8F5E9"
                 />
                 <RoleCard
-                    title="Restaurant"
-                    desc="Hotel/Food"
+                    title={t.restaurant}
+                    desc={t.hotelFood}
                     iconUri="https://img.icons8.com/color/96/restaurant.png"
                     onPress={() => handleRoleSelect('buyer', 'hotel')}
                     color="#FFF3E0"
                 />
                 <RoleCard
-                    title="Wholesaler"
-                    desc="Bulk Agent"
+                    title={t.wholesaler}
+                    desc={t.bulkAgent}
                     iconUri="https://img.icons8.com/color/96/warehouse.png"
                     onPress={() => handleRoleSelect('buyer', 'wholesaler')}
                     color="#F3E5F5"

@@ -1,8 +1,9 @@
+import { registerUserPhone } from '@/utils/api';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const INTERESTS = [
     { name: 'Vegetables', icon: 'nutrition-outline' },
@@ -29,9 +30,49 @@ export default function Preferences() {
     };
 
     const handleStart = async () => {
-        // Save preferences
-        await AsyncStorage.setItem('current_user', JSON.stringify({ role: 'buyer', name: 'Buyer User' }));
-        router.replace('/(tabs)');
+        try {
+            // Retrieve previous steps data
+            const buyerStr = await AsyncStorage.getItem('temp_reg_buyer');
+            if (!buyerStr) {
+                Alert.alert("Error", "Session expired. Please start over.");
+                router.replace('/signup/buyer/registration');
+                return;
+            }
+
+            const buyerData = JSON.parse(buyerStr);
+
+            // Construct payload
+            const payload = {
+                phone: buyerData.mobile,
+                name: buyerData.name,
+                location: buyerData.location,
+                role: 'buyer',
+                buyerDetails: {
+                    subRole: buyerData.subRole,
+                    businessName: buyerData.businessName,
+                    storeImage: buyerData.storeImage,
+                    interests: selectedInterests,
+                    weeklyRequirement: quantity
+                }
+            };
+
+            // Call API
+            const response = await registerUserPhone(payload);
+
+            // Save confirmed user profile
+            await AsyncStorage.setItem('current_user', JSON.stringify(response.profile || response.user));
+
+            // Clean up temp
+            await AsyncStorage.removeItem('temp_reg_buyer');
+
+            // Set active role
+            await AsyncStorage.setItem('user_role', 'buyer');
+
+            Alert.alert("Success!", "Account created successfully.");
+            router.replace('/(tabs)');
+        } catch (error: any) {
+            Alert.alert("Registration Failed", error.message || "Could not create account.");
+        }
     };
 
     return (

@@ -3,6 +3,7 @@ import { fetchProfile, saveProfile } from '@/utils/api';
 import { scheduleNotification } from '@/utils/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -27,7 +28,9 @@ export default function ProfileScreen() {
     const [phone, setPhone] = useState('');
     const [location, setLocation] = useState('');
     const [bio, setBio] = useState('');
-    const [photo, setPhoto] = useState('');
+    const [photoUrl, setPhotoUrl] = useState('');
+    const [email, setEmail] = useState('');
+    const [isGoogleLinked, setIsGoogleLinked] = useState(false);
     const [loading, setLoading] = useState(true);
 
     // Account Details State
@@ -37,53 +40,96 @@ export default function ProfileScreen() {
     const [bankName, setBankName] = useState('');
     const [walletBalance, setWalletBalance] = useState(0);
 
+    // Buyer Specific State
+    const [subRole, setSubRole] = useState('');
+    const [businessName, setBusinessName] = useState('');
+    const [interests, setInterests] = useState<string[]>([]);
+    const [weeklyRequirement, setWeeklyRequirement] = useState('');
+
+    // Initial Role Check: If no param, try to load from storage
     useEffect(() => {
-        loadProfile();
+        const initRole = async () => {
+            if (!params.role) {
+                const storedRole = await AsyncStorage.getItem('user_role');
+                // Only update if different to avoid unnecessary cycles, though React handles this
+                if (storedRole === 'buyer' || storedRole === 'farmer') {
+                    if (storedRole !== role) {
+                        setRole(storedRole);
+                    }
+                }
+            }
+        };
+        initRole();
     }, []);
 
-    // Effect to reload profile when role changes locally (from switcher)
+    // Load Data whenever role changes (includes initial render)
     useEffect(() => {
         loadProfile();
     }, [role]);
 
     const loadProfile = async () => {
         try {
-            // Check locally stored role preference
-            const storedRole = await AsyncStorage.getItem('user_role');
-            // We rely on state 'role' but in a full app might sync this.
+            // Get the currently logged-in user stored during login/signup
+            const userStr = await AsyncStorage.getItem('current_user');
+            // Check if linked with Google
+            const auth = await AsyncStorage.getItem('user_auth');
+            setIsGoogleLinked(!!auth);
 
-            // Fetch specific profile for current role from API
-            const profileData = await fetchProfile(role);
-
-            if (profileData && profileData.name) {
-                const { name, storeName, phone, location, bio, photo, bankDetails, walletBalance } = profileData;
-                setName(name || '');
-                setStoreName(storeName || '');
-                setPhone(phone || '');
-                setLocation(location || '');
-                setBio(bio || '');
-                setPhoto(photo || '');
-                setWalletBalance(walletBalance || 0);
-
-                if (bankDetails) {
-                    setAccountNumber(bankDetails.accountNumber || '');
-                    setIfscCode(bankDetails.ifscCode || '');
-                    setUpsId(bankDetails.upsId || '');
-                    setBankName(bankDetails.bankName || '');
-                } else {
-                    setAccountNumber(''); setIfscCode(''); setUpsId(''); setBankName('');
-                }
+            if (!userStr) {
+                // If no user is logged in, show defaults or redirect to login (optional)
+                console.log("No user found in storage");
+                // Use defaults below
             } else {
-                // Defaults if no profile saved yet
-                setName(role === 'farmer' ? 'Ramesh Farm' : 'Anjali Buyer');
-                setStoreName(role === 'farmer' ? 'Ramesh Organics' : '');
-                setPhone('+91 98765 43210');
-                setLocation(role === 'farmer' ? 'Coimbatore, Tamil Nadu' : 'Bangalore, Karnataka');
-                setBio(role === 'farmer' ? 'Organic farming since 2010.' : 'Love fresh vegetables.');
-                setPhoto('');
-                setAccountNumber(''); setIfscCode(''); setUpsId(''); setBankName('');
-                setWalletBalance(0);
+                const currentUser = JSON.parse(userStr);
+                const userId = currentUser.userId || currentUser._id; // Handle both formats
+
+                if (userId) {
+                    // Fetch real profile from backend
+                    const profileData = await fetchProfile(userId, role);
+
+                    if (profileData) {
+                        const { name, storeName, phone, location, bio, photo, bankDetails, walletBalance, buyerDetails } = profileData;
+                        setName(name || currentUser.name || '');
+                        setStoreName(storeName || '');
+                        setPhone(phone || currentUser.phone || '');
+                        setLocation(location || (typeof currentUser.location === 'string' ? currentUser.location : '') || '');
+                        setBio(bio || '');
+                        setPhotoUrl(photo || currentUser.photo || currentUser.picture || '');
+                        setEmail(currentUser.email || '');
+
+                        setWalletBalance(walletBalance || 0);
+
+                        if (bankDetails) {
+                            setAccountNumber(bankDetails.accountNumber || '');
+                            setIfscCode(bankDetails.ifscCode || '');
+                            setUpsId(bankDetails.upsId || '');
+                            setBankName(bankDetails.bankName || '');
+                        }
+
+                        if (buyerDetails) {
+                            setSubRole(buyerDetails.subRole || 'consumer');
+                            setBusinessName(buyerDetails.businessName || '');
+                            setInterests(buyerDetails.interests || []);
+                            setWeeklyRequirement(buyerDetails.weeklyRequirement || '');
+                        }
+                        return; // Successfully loaded real data
+                    }
+                }
             }
+
+            // Fallback Defaults (If no user logged in or profile fetch failed)
+            setName(role === 'farmer' ? 'Ramesh Farm' : 'Anjali Buyer');
+            setStoreName(role === 'farmer' ? 'Ramesh Organics' : '');
+            setPhone('+91 98765 43210');
+            setLocation(role === 'farmer' ? 'Coimbatore, Tamil Nadu' : 'Bangalore, Karnataka');
+            setBio(role === 'farmer' ? 'Organic farming since 2010.' : 'Love fresh vegetables.');
+            setPhotoUrl('');
+            setEmail('');
+            setIsGoogleLinked(false);
+            setAccountNumber(''); setIfscCode(''); setUpsId(''); setBankName('');
+            setWalletBalance(0);
+            // Default buyer state reset
+            setSubRole(''); setBusinessName(''); setInterests([]); setWeeklyRequirement('');
         } catch (e) {
             console.error("Failed to load profile", e);
         } finally {
@@ -93,13 +139,28 @@ export default function ProfileScreen() {
 
     const handleSave = async () => {
         try {
+            // Get current real user
+            let userId = "demo@kisan.com";
+            const userStr = await AsyncStorage.getItem('current_user');
+            if (userStr) {
+                const u = JSON.parse(userStr);
+                userId = u.userId || u._id || userId;
+            }
+
             const profileData = {
-                role, name, storeName, phone, location, bio, photo,
+                userId, // Include the userId in the save payload
+                role, name, storeName, phone, location, bio, photo: photoUrl,
                 bankDetails: {
                     accountNumber,
                     ifscCode,
                     upsId,
                     bankName
+                },
+                buyerDetails: {
+                    subRole,
+                    businessName,
+                    interests,
+                    weeklyRequirement
                 }
             };
             await saveProfile(profileData);
@@ -115,11 +176,69 @@ export default function ProfileScreen() {
         }
     };
 
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.5,
+        });
+
+        if (!result.canceled) {
+            setPhotoUrl(result.assets[0].uri);
+        }
+    };
+
     const switchAccount = async () => {
         const newRole = role === 'farmer' ? 'buyer' : 'farmer';
-        setRole(newRole);
-        await AsyncStorage.setItem('user_role', newRole);
-        Alert.alert("Account Switched", `You are now interacting as a ${newRole}.`);
+
+        // 1. Get current logged-in user ID to check existence
+        let userId = null;
+        const userStr = await AsyncStorage.getItem('current_user');
+        if (userStr) {
+            const u = JSON.parse(userStr);
+            userId = u.userId || u._id;
+        }
+
+        // If generic login not found, allow switch (fallback behavior) but warn
+        if (!userId) {
+            setRole(newRole);
+            await AsyncStorage.setItem('user_role', newRole);
+            Alert.alert("Account Switched", `You are now viewing as a ${newRole} (Guest).`);
+            return;
+        }
+
+        // 2. Check if profile exists for the NEW role
+        setLoading(true);
+        const existingProfile = await fetchProfile(userId, newRole);
+        setLoading(false);
+
+        if (existingProfile) {
+            // Profile exists, switch context
+            setRole(newRole);
+            await AsyncStorage.setItem('user_role', newRole);
+            Alert.alert("Account Switched", `You are now interacting as a ${newRole}.`);
+        } else {
+            // Profile does NOT exist for this role
+            Alert.alert(
+                "Account Not Found",
+                `You don't have a ${newRole} profile yet. Do you want to create one?`,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Create Account",
+                        onPress: () => {
+                            // Redirect to the signup flow for that role
+                            if (newRole === 'farmer') {
+                                router.push('/signup/farmer/login');
+                            } else {
+                                router.push('/signup/buyer/registration');
+                            }
+                        }
+                    }
+                ]
+            );
+        }
     };
 
     if (loading) {
@@ -132,14 +251,19 @@ export default function ProfileScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="white" />
                 </TouchableOpacity>
-                <View style={styles.avatarContainer}>
-                    <Image
-                        source={{ uri: photo || (role === 'farmer' ? 'https://img.icons8.com/color/96/farmer-male.png' : 'https://img.icons8.com/color/96/user.png') }}
-                        style={styles.avatar}
-                    />
+                <View style={[styles.avatarContainer, { marginBottom: 20 }]}>
+                    <TouchableOpacity onPress={pickImage} style={{ alignItems: 'center' }}>
+                        <Image
+                            source={{ uri: photoUrl || (role === 'farmer' ? 'https://img.icons8.com/color/96/farmer-male.png' : 'https://img.icons8.com/color/96/user.png') }}
+                            style={styles.avatar}
+                        />
+                        <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: THEME_COLOR, borderRadius: 15, padding: 4 }}>
+                            <Ionicons name="camera" size={16} color="white" />
+                        </View>
+                    </TouchableOpacity>
                 </View>
-                {/* Spacer to balance header */}
-                <View style={{ width: 24 }} />
+
+                {/* Spacer (removed previous absolute positioning logic to simplify) */}
             </View>
 
             <View style={styles.form}>
@@ -157,6 +281,25 @@ export default function ProfileScreen() {
                     <TextInput style={styles.input} value={name} onChangeText={setName} />
                 </View>
 
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Email</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <TextInput
+                            style={[styles.input, { flex: 1, color: isGoogleLinked ? '#666' : '#333' }]}
+                            value={email}
+                            onChangeText={setEmail}
+                            editable={!isGoogleLinked}
+                            placeholder="your@email.com"
+                        />
+                        {isGoogleLinked && (
+                            <View style={{ marginLeft: 10, alignItems: 'center', justifyContent: 'center' }}>
+                                <Image source={{ uri: 'https://img.icons8.com/color/48/google-logo.png' }} style={{ width: 24, height: 24 }} />
+                                <Text style={{ fontSize: 10, color: '#4CAF50', fontWeight: 'bold' }}>Linked</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+
                 {role === 'farmer' && (
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Store Name</Text>
@@ -164,15 +307,7 @@ export default function ProfileScreen() {
                     </View>
                 )}
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Profile Photo URL</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={photo}
-                        onChangeText={setPhoto}
-                        placeholder="https://example.com/photo.jpg"
-                    />
-                </View>
+                {/* Removed Profile Photo URL Input as we now have the picker above */}
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>About / Bio</Text>
@@ -191,6 +326,41 @@ export default function ProfileScreen() {
                         <Text style={styles.walletTitle}>💰 Wallet Balance</Text>
                         <Text style={styles.walletAmount}>₹{walletBalance.toLocaleString()}</Text>
                         <Text style={styles.walletSubtitle}>Total Earnings from Sales</Text>
+                    </View>
+                )}
+
+                {role === 'buyer' && (
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.subSectionTitle}>Buying Preferences</Text>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Buyer Type</Text>
+                            <TextInput style={[styles.input, { backgroundColor: '#f0f0f0' }]} value={subRole === 'consumer' ? 'Home / Consumer' : 'Business / Retailer'} editable={false} />
+                        </View>
+
+                        {subRole === 'business' && (
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Business Name</Text>
+                                <TextInput style={styles.input} value={businessName} onChangeText={setBusinessName} />
+                            </View>
+                        )}
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Approx. Weekly Need</Text>
+                            <TextInput style={styles.input} value={weeklyRequirement} onChangeText={setWeeklyRequirement} />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Interests</Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 }}>
+                                {interests.map((int, i) => (
+                                    <View key={i} style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15, borderWidth: 1, borderColor: '#4CAF50' }}>
+                                        <Text style={{ color: '#4CAF50', fontSize: 12 }}>{int}</Text>
+                                    </View>
+                                ))}
+                                {interests.length === 0 && <Text style={{ color: '#999', fontStyle: 'italic' }}>No interests selected</Text>}
+                            </View>
+                        </View>
                     </View>
                 )}
 
@@ -238,7 +408,15 @@ export default function ProfileScreen() {
                             { text: "Cancel", style: "cancel" },
                             {
                                 text: "Sign Out", style: 'destructive', onPress: async () => {
-                                    await AsyncStorage.removeItem('user_auth');
+                                    await AsyncStorage.multiRemove([
+                                        'user_auth',
+                                        'current_user',
+                                        'user_role',
+                                        'user_sub_role',
+                                        'user_email',
+                                        'user_name',
+                                        'temp_reg_buyer'
+                                    ]);
                                     router.replace('/login');
                                 }
                             }
@@ -257,7 +435,7 @@ const styles = StyleSheet.create({
     header: { height: 180, backgroundColor: THEME_COLOR, alignItems: 'center', justifyContent: 'space-between', flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 40, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
     backButton: { marginBottom: 20 },
     avatarContainer: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', marginBottom: -90, elevation: 5 },
-    avatar: { width: 80, height: 80 },
+    avatar: { width: 90, height: 90, borderRadius: 45 },
     form: { padding: 25, marginTop: 60 },
     sectionTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 30, color: '#333' },
     inputGroup: { marginBottom: 20 },
@@ -270,5 +448,7 @@ const styles = StyleSheet.create({
     walletCard: { backgroundColor: '#E8F5E9', padding: 20, borderRadius: 15, marginBottom: 20, alignItems: 'center', borderWidth: 1, borderColor: THEME_COLOR },
     walletTitle: { fontSize: 16, color: '#333', fontWeight: 'bold', marginBottom: 5 },
     walletAmount: { fontSize: 28, color: THEME_COLOR, fontWeight: 'bold' },
-    walletSubtitle: { fontSize: 12, color: '#666' }
+    walletSubtitle: { fontSize: 12, color: '#666' },
+    sectionContainer: { marginBottom: 20, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#eee' },
+    subSectionTitle: { fontSize: 18, fontWeight: '600', color: '#444', marginBottom: 15 }
 });

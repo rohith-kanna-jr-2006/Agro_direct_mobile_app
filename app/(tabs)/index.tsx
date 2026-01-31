@@ -1,7 +1,11 @@
-import { TRANSLATIONS } from '@/constants/translations';
+import { useLanguage } from '@/hooks/useLanguage';
+import { fetchProfile } from '@/utils/api';
 import { scheduleNotification } from '@/utils/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
@@ -16,6 +20,7 @@ maybeCompleteAuthSession();
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { language, setLanguage, t } = useLanguage();
 
   const redirectUri = makeRedirectUri({
     scheme: 'kisansmartapp',
@@ -32,12 +37,8 @@ export default function HomeScreen() {
     redirectUri,
   });
 
-
-
   // Local state for the onboarding flow
   const [step, setStep] = useState<'lang' | 'role' | 'auth' | 'forgot' | 'home'>('role');
-
-  const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
   const [role, setRole] = useState<'farmer' | 'buyer'>('farmer');
 
   // Auth State
@@ -45,21 +46,47 @@ export default function HomeScreen() {
   const [identifier, setIdentifier] = useState(''); // Stores Phone or Email
   const [password, setPassword] = useState('');
   const [userInfo, setUserInfo] = useState<any>(null);
-
-  const t = TRANSLATIONS[lang];
+  const [profileName, setProfileName] = useState('');
 
   // Check for persistent login
   useEffect(() => {
     checkSession();
   }, []);
 
+  // Fetch fresher profile data whenever the screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      if (userInfo && (userInfo.email || userInfo.id)) {
+        // Use email if available (for logged in users), or 'guest' 
+        const userId = userInfo.email || userInfo.id;
+        // Only fetch if it's a real user (not necessarily guest, unless we want guest profiles)
+        if (userId !== 'guest') {
+          fetchProfile(userId, role).then(data => {
+            if (data && data.name) {
+              setProfileName(data.name);
+            }
+          });
+        }
+      }
+    }, [userInfo, role])
+  );
+
   const checkSession = async () => {
     try {
       const session = await AsyncStorage.getItem('current_user');
+      const savedEmail = await AsyncStorage.getItem('user_email'); // Get the consistent email key
+
       if (session) {
         const user = JSON.parse(session);
+        // Ensure we have the latest email if it was saved separately
+        if (savedEmail && !user.email) user.email = savedEmail;
+
         setRole(user.role);
         setUserInfo(user);
+        setStep('home');
+      } else if (savedEmail) {
+        // If we have a user_email but no full session object (e.g. from Google Login flow)
+        setUserInfo({ email: savedEmail, name: await AsyncStorage.getItem('user_name') });
         setStep('home');
       } else {
         router.replace('/signup/language');
@@ -175,18 +202,91 @@ export default function HomeScreen() {
 
   // 1. Language Step
   if (step === 'lang') {
+    const LANGUAGES = [
+      { code: 'en', name: 'English', native: 'English' },
+      { code: 'hi', name: 'Hindi', native: 'हिंदी' },
+      { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+      { code: 'mr', name: 'Marathi', native: 'मराठी' },
+      { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+      { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
+    ];
+
+    const { width } = require('react-native').Dimensions.get('window');
+
     return (
-      <View style={[styles.container, styles.centerContainer]}>
-        <Text style={styles.title}>Select Language / மொழி / भाषा</Text>
-        <TouchableOpacity style={styles.langButton} onPress={() => { setLang('en'); setStep('role'); }}>
-          <Text style={styles.langButtonText}>English</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.langButton} onPress={() => { setLang('ta'); setStep('role'); }}>
-          <Text style={styles.langButtonText}>தமிழ் (Tamil)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.langButton} onPress={() => { setLang('hi'); setStep('role'); }}>
-          <Text style={styles.langButtonText}>हिंदी (Hindi)</Text>
-        </TouchableOpacity>
+      <View style={[styles.container, { backgroundColor: '#FFFFFF', paddingTop: 60 }]}>
+        <View style={{ alignItems: 'center', marginBottom: 30, paddingHorizontal: 20 }}>
+          <Text style={{ fontSize: 28, fontWeight: '800', color: '#2C3E50', textAlign: 'center', marginBottom: 8 }}>
+            Select Language / भाषा
+          </Text>
+          <Text style={{ fontSize: 16, color: '#7F8C8D', textAlign: 'center' }}>
+            Choose your preferred language
+          </Text>
+        </View>
+
+        <View style={{ flex: 1, paddingHorizontal: 20 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            {LANGUAGES.map((item) => (
+              <TouchableOpacity
+                key={item.code}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  width: (width - 60) / 2,
+                  borderRadius: 24,
+                  paddingVertical: 24,
+                  paddingHorizontal: 16,
+                  alignItems: 'center',
+                  marginBottom: 20,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 12,
+                  elevation: 4,
+                  borderWidth: 1,
+                  borderColor: language === item.code ? THEME_COLOR : '#F0F0F0',
+                }}
+                onPress={() => {
+                  setLanguage(item.code as any);
+                  setStep('role'); // Or 'home' if they came from home? 
+                  // Ideally if previously logged in, go to home?
+                  // But step='role' is a safe default for re-selection flow.
+                  // If they were already on home, role selection allows them to 'reset' experience or just go back.
+                  // Let's check if we have user info to decide next step.
+                  if (userInfo) {
+                    setStep('home');
+                  } else {
+                    setStep('role');
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: item.code === 'en' ? '#E3F2FD' : '#E8F5E9',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}>
+                  <Text style={{
+                    fontSize: 28,
+                    fontWeight: 'bold',
+                    color: item.code === 'en' ? '#1976D2' : '#2E7D32',
+                  }}>
+                    {item.native.charAt(0)}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#212121', marginBottom: 4 }}>
+                  {item.native}
+                </Text>
+                <Text style={{ fontSize: 14, color: '#9E9E9E', fontWeight: '500' }}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
       </View>
     );
   }
@@ -204,7 +304,7 @@ export default function HomeScreen() {
             onPress={() => setStep('lang')}
           >
             <Ionicons name="language" size={20} color={THEME_COLOR} />
-            <Text style={styles.langButtonSmallText}>{lang.toUpperCase()}</Text>
+            <Text style={styles.langButtonSmallText}>{language.toUpperCase()}</Text>
           </TouchableOpacity>
         </View>
 
@@ -377,7 +477,7 @@ export default function HomeScreen() {
         return;
       }
     }
-    router.push({ pathname: route, params: { lang, role: role } });
+    router.push({ pathname: route as any, params: { lang: language, role: role } });
   };
 
   return (
@@ -385,7 +485,7 @@ export default function HomeScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t.appName}</Text>
-        <Text style={styles.headerSubtitle}>{role === 'farmer' ? t.farmer : t.buyer} - {userInfo?.name || t.welcome}</Text>
+        <Text style={styles.headerSubtitle}>{role === 'farmer' ? t.farmer : t.buyer} - {profileName || userInfo?.name || t.welcome}</Text>
 
         <TouchableOpacity onPress={switchAccount} style={{ position: 'absolute', top: 50, left: 20, zIndex: 10 }}>
           <Ionicons name="swap-horizontal" size={24} color="white" />

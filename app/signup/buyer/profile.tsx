@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -10,6 +10,10 @@ export default function BuyerProfile() {
     const [loading, setLoading] = useState(true);
     const [image, setImage] = useState<string | null>(null);
     const router = useRouter();
+    const { mobile } = useLocalSearchParams();
+    const [name, setName] = useState('');
+    const [address, setAddress] = useState('');
+    const [businessName, setBusinessName] = useState('');
 
     useEffect(() => {
         AsyncStorage.getItem('user_sub_role').then(r => {
@@ -43,10 +47,10 @@ export default function BuyerProfile() {
 
             <View style={styles.form}>
                 <Text style={styles.label}>Your Name</Text>
-                <TextInput style={styles.input} placeholder="John Doe" />
+                <TextInput style={styles.input} placeholder="John Doe" value={name} onChangeText={setName} />
 
                 <Text style={styles.label}>Address</Text>
-                <TextInput style={styles.input} placeholder="Start typing address..." />
+                <TextInput style={styles.input} placeholder="Start typing address..." value={address} onChangeText={setAddress} />
                 <TouchableOpacity style={styles.locationBtn}>
                     <Ionicons name="location-sharp" size={18} color="#2575FC" />
                     <Text style={styles.locationText}>Use Current Location</Text>
@@ -57,7 +61,7 @@ export default function BuyerProfile() {
                         <Text style={styles.sectionTitle}>Business Details</Text>
 
                         <Text style={styles.label}>Business Name</Text>
-                        <TextInput style={styles.input} placeholder="e.g. Saravana Bhavan" />
+                        <TextInput style={styles.input} placeholder="e.g. Saravana Bhavan" value={businessName} onChangeText={setBusinessName} />
 
                         <Text style={styles.label}>GST Number (Optional)</Text>
                         <TextInput style={styles.input} placeholder="GSTIN..." autoCapitalize="characters" />
@@ -77,7 +81,22 @@ export default function BuyerProfile() {
                 )}
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={() => router.push('/signup/buyer/preferences')}>
+            <TouchableOpacity style={styles.button} onPress={async () => {
+                if (!name.trim()) {
+                    alert("Please enter your name");
+                    return;
+                }
+                const data = {
+                    mobile,
+                    name,
+                    location: address,
+                    subRole: subRole || 'consumer',
+                    businessName,
+                    storeImage: image
+                };
+                await AsyncStorage.setItem('temp_reg_buyer', JSON.stringify(data));
+                router.push('/signup/buyer/preferences');
+            }}>
                 <Text style={styles.buttonText}>Next Step</Text>
             </TouchableOpacity>
         </ScrollView>

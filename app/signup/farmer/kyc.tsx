@@ -1,14 +1,16 @@
+import { registerUserPhone } from '@/utils/api';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function KYC() {
     const router = useRouter();
     const [frontImage, setFrontImage] = useState<string | null>(null);
     const [backImage, setBackImage] = useState<string | null>(null);
+    const [bank, setBank] = useState({ account: '', ifsc: '', bankName: '' });
 
     const pickImage = async (setFunction: Function) => {
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -22,9 +24,50 @@ export default function KYC() {
     };
 
     const handleFinish = async () => {
-        // In a real app, you'd submit data to backend here
-        await AsyncStorage.setItem('current_user', JSON.stringify({ role: 'farmer', name: 'Farmer User' }));
-        router.replace('/(tabs)');
+        try {
+            // Retrieve previous steps data
+            const personalStr = await AsyncStorage.getItem('temp_reg_personal');
+            const farmStr = await AsyncStorage.getItem('temp_reg_farm');
+
+            if (!personalStr) {
+                Alert.alert("Error", "Session expired. Please start over.");
+                router.replace('/signup/farmer/login');
+                return;
+            }
+
+            const personalData = JSON.parse(personalStr);
+            const farmData = farmStr ? JSON.parse(farmStr) : null;
+
+            // Construct payload
+            const payload = {
+                phone: personalData.mobile, // From login/personal-details
+                name: personalData.name,
+                location: personalData.address, // Structured object
+                role: 'farmer',
+                farmDetails: farmData,
+                bankDetails: {
+                    accountNumber: bank.account,
+                    ifscCode: bank.ifsc,
+                    bankName: bank.bankName
+                }
+            };
+
+            // Call API
+            const response = await registerUserPhone(payload);
+
+            // Save confirmed user profile
+            await AsyncStorage.setItem('current_user', JSON.stringify(response.profile || response.user));
+            await AsyncStorage.setItem('user_role', 'farmer');
+
+            // Clean up temp
+            await AsyncStorage.removeItem('temp_reg_personal');
+            await AsyncStorage.removeItem('temp_reg_farm');
+
+            Alert.alert("Welcome!", "Your account has been created successfully.");
+            router.replace('/(tabs)');
+        } catch (error: any) {
+            Alert.alert("Registration Failed", error.message || "Could not create account.");
+        }
     };
 
     return (
@@ -59,9 +102,26 @@ export default function KYC() {
             </View>
 
             <Text style={styles.sectionTitle}>Bank Details</Text>
-            <TextInput style={styles.input} placeholder="Account Number" keyboardType="numeric" />
-            <TextInput style={styles.input} placeholder="IFSC Code" autoCapitalize="characters" />
-            <TextInput style={styles.input} placeholder="Bank Name" />
+            <TextInput
+                style={styles.input}
+                placeholder="Account Number"
+                keyboardType="numeric"
+                value={bank.account}
+                onChangeText={(t) => setBank({ ...bank, account: t })}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="IFSC Code"
+                autoCapitalize="characters"
+                value={bank.ifsc}
+                onChangeText={(t) => setBank({ ...bank, ifsc: t })}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Bank Name"
+                value={bank.bankName}
+                onChangeText={(t) => setBank({ ...bank, bankName: t })}
+            />
 
             <TouchableOpacity style={styles.button} onPress={handleFinish}>
                 <Text style={styles.buttonText}>Finish Setup</Text>

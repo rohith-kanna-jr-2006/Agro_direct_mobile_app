@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -80,7 +81,10 @@ export default function FarmDetails() {
                 ))}
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={() => router.push('/signup/farmer/kyc')}>
+            <TouchableOpacity style={styles.button} onPress={async () => {
+                await AsyncStorage.setItem('temp_reg_farm', JSON.stringify({ acres, crops: selectedCrops, irrigation }));
+                router.push('/signup/farmer/kyc');
+            }}>
                 <Text style={styles.buttonText}>Next</Text>
             </TouchableOpacity>
         </ScrollView>

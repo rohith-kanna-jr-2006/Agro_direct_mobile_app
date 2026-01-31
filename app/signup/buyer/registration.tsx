@@ -1,15 +1,115 @@
+import { fetchProfile, saveProfile, sendOtp } from '@/utils/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useEffect, useState } from 'react';
+import { Alert, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function BuyerRegistration() {
     const router = useRouter();
-    const [identifier, setIdentifier] = useState('');
-    const [password, setPassword] = useState('');
+    const [mobile, setMobile] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleContinue = () => {
-        // Logic to validate
-        router.push('/signup/buyer/profile');
+    const redirectUri = makeRedirectUri({
+        scheme: 'kisansmartapp',
+        path: 'auth'
+    });
+
+    // Google Auth Config
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        webClientId: "80509016220-jmf6jt7oedmudt2pti13vl28fkoetnbs.apps.googleusercontent.com",
+        androidClientId: "80509016220-jmf6jt7oedmudt2pti13vl28fkoetnbs.apps.googleusercontent.com",
+        redirectUri: redirectUri
+    });
+
+    useEffect(() => {
+        // DEBUG: Remove this after configuring Google Cloud Console
+        if (request) {
+            console.log("Redirect URI:", request.redirectUri);
+            // Alert.alert("Setup Required", `Please add this Redirect URI to your Google Cloud Console:\n\n${request.redirectUri}`);
+        }
+    }, [request]);
+
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { authentication } = response;
+            if (authentication?.accessToken) {
+                getUserInfo(authentication.accessToken);
+            }
+        } else if (response?.type === 'error') {
+            Alert.alert("Authentication Error", "Please ensure your Redirect URI is configured in Google Cloud Console.");
+        }
+    }, [response]);
+
+    const getUserInfo = async (token: string) => {
+        setLoading(true);
+        try {
+            const res = await fetch("https://www.googleapis.com/userinfo/v2/me", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const user = await res.json();
+
+            // Save user info
+            await AsyncStorage.setItem('user_auth', JSON.stringify(user));
+            await AsyncStorage.setItem('user_email', user.email);
+            if (user.name) await AsyncStorage.setItem('user_name', user.name);
+
+            // Mark as logged in
+            const currentUser = {
+                ...user,
+                type: 'buyer',
+                userId: user.email,
+                role: 'buyer',
+                photo: user.picture
+            };
+            await AsyncStorage.setItem('current_user', JSON.stringify(currentUser));
+            await AsyncStorage.setItem('user_role', 'buyer');
+
+            // SYNC WITH BACKEND
+            try {
+                const existingProfile = await fetchProfile(currentUser.userId, 'buyer');
+                if (!existingProfile) {
+                    await saveProfile({
+                        userId: currentUser.userId,
+                        role: 'buyer',
+                        name: currentUser.name,
+                        email: currentUser.email,
+                        photo: currentUser.picture,
+                        buyerDetails: { subRole: 'consumer', interests: [] }
+                    });
+                }
+            } catch (e) {
+                console.error("Backend sync failed in reg:", e);
+            }
+
+            Alert.alert("Success", `Welcome ${user.name}!`);
+            router.replace('/(tabs)');
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "Failed to fetch user info");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleContinue = async () => {
+        if (mobile.length < 10) {
+            Alert.alert("Invalid Number", "Please enter a valid 10-digit mobile number");
+            return;
+        }
+        setLoading(true);
+        try {
+            await sendOtp(mobile);
+            router.push({ pathname: '/signup/buyer/otp', params: { mobile } });
+        } catch (error: any) {
+            Alert.alert("Error", error.message || "Failed to send OTP");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -19,26 +119,18 @@ export default function BuyerRegistration() {
                 <Text style={styles.subHeader}>Sign up to start buying fresh produce</Text>
 
                 <View style={styles.form}>
-                    <Text style={styles.label}>Email or Mobile Number</Text>
+                    <Text style={styles.label}>Mobile Number</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="john@example.com / 9876543210"
-                        value={identifier}
-                        onChangeText={setIdentifier}
-                        autoCapitalize="none"
+                        placeholder="9876543210"
+                        value={mobile}
+                        onChangeText={setMobile}
+                        keyboardType="phone-pad"
+                        maxLength={10}
                     />
 
-                    <Text style={styles.label}>Password (Optional for OTP)</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Create a password"
-                        secureTextEntry
-                        value={password}
-                        onChangeText={setPassword}
-                    />
-
-                    <TouchableOpacity style={styles.button} onPress={handleContinue}>
-                        <Text style={styles.buttonText}>Sign Up</Text>
+                    <TouchableOpacity style={styles.button} onPress={handleContinue} disabled={loading}>
+                        <Text style={styles.buttonText}>{loading ? "Sending OTP..." : "Continue"}</Text>
                     </TouchableOpacity>
 
                     <View style={styles.divider}>
@@ -47,7 +139,11 @@ export default function BuyerRegistration() {
                         <View style={styles.line} />
                     </View>
 
-                    <TouchableOpacity style={styles.socialButton}>
+                    <TouchableOpacity
+                        style={styles.socialButton}
+                        onPress={() => promptAsync()}
+                        disabled={!request}
+                    >
                         <Image source={{ uri: 'https://img.icons8.com/color/48/google-logo.png' }} style={styles.socialIcon} />
                         <Text style={styles.socialText}>Continue with Google</Text>
                     </TouchableOpacity>

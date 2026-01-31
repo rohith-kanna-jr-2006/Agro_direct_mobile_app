@@ -1,19 +1,84 @@
+import { sendOtp } from '@/utils/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useEffect, useState } from 'react';
+import { Alert, Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function FarmerLogin() {
     const [mobile, setMobile] = useState('');
     const router = useRouter();
 
-    const handleGetOTP = () => {
+    const redirectUri = makeRedirectUri({
+        scheme: 'kisansmartapp',
+        path: 'auth'
+    });
+
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        webClientId: "80509016220-jmf6jt7oedmudt2pti13vl28fkoetnbs.apps.googleusercontent.com",
+        androidClientId: "80509016220-jmf6jt7oedmudt2pti13vl28fkoetnbs.apps.googleusercontent.com",
+        redirectUri: redirectUri
+    });
+
+    useEffect(() => {
+        // DEBUG: Remove this after configuring Google Cloud Console
+        if (request) {
+            console.log("Redirect URI:", request.redirectUri);
+            // Alert.alert("Setup Required", `Please add this Redirect URI to your Google Cloud Console:\n\n${request.redirectUri}`);
+        }
+    }, [request]);
+
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { authentication } = response;
+            if (authentication?.accessToken) {
+                getUserInfo(authentication.accessToken);
+            }
+        } else if (response?.type === 'error') {
+            Alert.alert("Authentication Error", "Please ensure your Redirect URI is configured in Google Cloud Console.");
+        }
+    }, [response]);
+
+    const getUserInfo = async (token: string) => {
+        try {
+            const res = await fetch("https://www.googleapis.com/userinfo/v2/me", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const user = await res.json();
+
+            // Save user info
+            await AsyncStorage.setItem('user_auth', JSON.stringify(user));
+            await AsyncStorage.setItem('user_email', user.email);
+            if (user.name) await AsyncStorage.setItem('user_name', user.name);
+
+            // Mark as logged in
+            await AsyncStorage.setItem('current_user', JSON.stringify({ ...user, type: 'farmer' }));
+
+            Alert.alert("Success", `Welcome ${user.name}!`);
+            router.replace('/(tabs)');
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "Failed to fetch user info");
+        }
+    };
+
+    const handleGetOTP = async () => {
         if (mobile.length === 10) {
-            router.push({ pathname: '/signup/farmer/otp', params: { mobile } });
+            try {
+                await sendOtp(mobile);
+                Alert.alert("OTP Sent", `Verification code sent to +91 ${mobile}`);
+                router.push({ pathname: '/signup/farmer/otp', params: { mobile } });
+            } catch (error: any) {
+                Alert.alert("Error", error.message || "Failed to send OTP");
+            }
         } else {
-            // In a real app, show a toast or inline error
-            alert("Please enter a valid 10-digit mobile number");
+            Alert.alert("Invalid Number", "Please enter a valid 10-digit mobile number");
         }
     };
 
@@ -60,6 +125,21 @@ export default function FarmerLogin() {
                     <Text style={styles.buttonText}>Get OTP</Text>
                     <Image source={{ uri: 'https://img.icons8.com/ios-filled/50/ffffff/arrow.png' }} style={styles.arrowIcon} />
                 </TouchableOpacity>
+
+                <View style={styles.divider}>
+                    <View style={styles.line} />
+                    <Text style={styles.orText}>OR</Text>
+                    <View style={styles.line} />
+                </View>
+
+                <TouchableOpacity
+                    style={styles.googleButton}
+                    onPress={() => promptAsync()}
+                >
+                    <Image source={{ uri: 'https://img.icons8.com/color/48/google-logo.png' }} style={styles.googleIcon} />
+                    <Text style={styles.googleButtonText}>Continue with Google</Text>
+                </TouchableOpacity>
+
             </View>
         </KeyboardAvoidingView>
     );
@@ -155,4 +235,46 @@ const styles = StyleSheet.create({
         height: 20,
         tintColor: '#fff',
     },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+        marginVertical: 30,
+    },
+    line: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E0E0E0',
+    },
+    orText: {
+        marginHorizontal: 10,
+        color: '#9E9E9E',
+        fontWeight: '600',
+    },
+    googleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        width: '100%',
+        height: 56,
+        borderRadius: 28,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    googleIcon: {
+        width: 24,
+        height: 24,
+        marginRight: 12,
+    },
+    googleButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+    }
 });
