@@ -12,8 +12,9 @@ const getApiUrl = () => {
         return `http://${localhost}:5000/api`;
     }
 
-    // Fallback for Android Emulator (10.0.2.2) or iOS Simulator/Web (localhost)
-    return Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+    // Fallback: Use LAN IP for Physical Device (APK), 10.0.2.2 for Emulator
+    // Current LAN IP: 10.178.132.211
+    return Platform.OS === 'android' ? 'http://10.178.132.211:5000/api' : 'http://localhost:5000/api';
 }
 
 const API_URL = getApiUrl();
@@ -109,9 +110,9 @@ export const rateOrder = async (id: string, rating: number) => {
     }
 };
 
-export const fetchProfile = async (role: string) => {
+export const fetchProfile = async (userId: string, role: string) => {
     try {
-        const res = await fetch(`${API_URL}/profile/${role}`);
+        const res = await fetch(`${API_URL}/profile/${userId}/${role}`);
         if (!res.ok) {
             // If 404 or other, return null to trigger default handling in UI
             return null;
@@ -145,5 +146,59 @@ export const fetchAnalytics = async () => {
     } catch (error) {
         console.error("API Error fetching analytics:", error);
         return null;
+    }
+};
+
+export const sendOtp = async (phone: string) => {
+    try {
+        // Ensure +91 format
+        const formattedNumber = phone.startsWith('+91') ? phone : `+91${phone}`;
+
+        const res = await fetch(`${API_URL}/send-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phoneNumber: formattedNumber })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || data.error || 'Failed to send OTP');
+        return data;
+    } catch (error) {
+        console.error("API Error sending OTP:", error);
+        throw error;
+    }
+};
+
+export const verifyOtp = async (phone: string, code: string, role?: string) => {
+    try {
+        const formattedNumber = phone.startsWith('+91') ? phone : `+91${phone}`;
+
+        const res = await fetch(`${API_URL}/verify-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phoneNumber: formattedNumber, code, role })
+        });
+        const data = await res.json();
+        // Backend determines success, but even with success=true, we might have logical issues to handle
+        if (!data.success) throw new Error(data.error || data.message || 'Failed to verify OTP');
+        return data;
+    } catch (error) {
+        console.error("API Error verifying OTP:", error);
+        throw error;
+    }
+};
+
+export const registerUserPhone = async (data: any) => {
+    try {
+        const res = await fetch(`${API_URL}/users/register-phone`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Failed to register');
+        return result;
+    } catch (error) {
+        console.error("API Error registering user:", error);
+        throw error;
     }
 };

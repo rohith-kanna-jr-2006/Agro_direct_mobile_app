@@ -31,3 +31,13 @@ The "Built" app uses a different digital signature (SHA-1 fingerprint) than your
 3.  Go to **Google Cloud Console** -> Credentials.
 4.  Create a **NEW** Android Client ID with this **NEW SHA-1**.
 5.  Update your code (`app/login.tsx`) with this new `androidClientId` and rebuild (or use OTA updates if configured).
+
+## Manual Web Preview (For Web Apps)
+If you are building the web version of "KisanDirect" and want to check responsiveness:
+
+1.  **Open Preview**: Click the Preview button (usually top right) to open the internal browser.
+2.  **Inspect**: Right-click anywhere inside the preview window and select **Inspect** (or Inspect Element).
+3.  **Toggle Device Toolbar**:
+    *   In the DevTools panel that opens, look for the **Device Toolbar icon** (a small phone/tablet icon 📱) in the top-left corner of the Inspector.
+    *   Click it (or press `Ctrl + Shift + M`) to toggle Mobile View.
+4.  **Select Device**: You can then select "iPhone SE", "Pixel 7", etc., from the dropdown.

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -11,6 +12,7 @@ export default function PersonalDetails() {
     const [address, setAddress] = useState({ state: '', district: '', village: '' });
     const [loadingLoc, setLoadingLoc] = useState(false);
     const router = useRouter();
+    const { mobile } = useLocalSearchParams();
 
     const takePhoto = async () => {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -61,11 +63,22 @@ export default function PersonalDetails() {
         }
     };
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (!name.trim()) {
             Alert.alert("Missing Information", "Please enter your full name.");
             return;
         }
+
+        // Save partial data
+        const data = {
+            mobile,
+            name,
+            address: address, // Keep structured
+            // Flattened location string for display if needed
+            locationString: `${address.village}, ${address.district}, ${address.state}`
+        };
+        await AsyncStorage.setItem('temp_reg_personal', JSON.stringify(data));
+
         router.push('/signup/farmer/farm-details');
     };
 

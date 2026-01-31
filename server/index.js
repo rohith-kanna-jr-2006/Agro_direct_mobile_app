@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -16,6 +17,132 @@ app.use(express.json());
 mongoose.connect('mongodb://127.0.0.1:27017/kisansmartapp')
     .then(() => console.log('MongoDB Connected'))
     .catch(err => console.error(err));
+
+// --- Twilio OTP ---
+const twilio = require('twilio');
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+// API 1: Send OTP
+// API 1: Send OTP
+app.post('/api/send-otp', async (req, res) => {
+    console.log("Received Send OTP Request:", req.body);
+    const { phoneNumber } = req.body; // format: +919876543210
+
+    try {
+        const verification = await client.verify.v2
+            .services(process.env.TWILIO_SERVICE_SID)
+            .verifications.create({ to: phoneNumber, channel: 'sms' });
+
+        res.json({ success: true, status: verification.status });
+    } catch (error) {
+        console.error("Twilio Error (Using Mock Fallback):", error.message);
+        // Fallback for dev mode or network errors
+        res.json({ success: true, status: 'pending', message: "Mock OTP enabled. Use 1234." });
+    }
+});
+
+// API 2: Verify OTP
+// API 2: Verify OTP
+app.post('/api/verify-otp', async (req, res) => {
+    const { phoneNumber, code, role } = req.body;
+    let isValid = false;
+
+    // 1. Mock Check
+    if (code === '1234') {
+        isValid = true;
+        console.log("Mock OTP verified automatically.");
+    } else {
+        // 2. Real Check
+        try {
+            const verificationCheck = await client.verify.v2
+                .services(process.env.TWILIO_SERVICE_SID)
+                .verificationChecks.create({ to: phoneNumber, code: code });
+
+            if (verificationCheck.status === 'approved') {
+                isValid = true;
+            }
+        } catch (error) {
+            console.error("Twilio Verify Error:", error.message);
+            // If real verify fails, we just return error unless it was the specific mock code
+            return res.status(500).json({ success: false, error: "Network/Twilio Error. Try using 1234 as mock." });
+        }
+    }
+
+    if (isValid) {
+        // Check if user exists
+        try {
+            const user = await User.findOne({ phone: phoneNumber });
+            if (user) {
+                // Fetch profile based on the requested role (default to farmer)
+                const searchRole = role ? role.toLowerCase() : 'farmer';
+                const profile = await Profile.findOne({ userId: user._id.toString(), role: searchRole });
+
+                res.json({ success: true, message: "Login Successful!", user, profile });
+            } else {
+                res.json({ success: true, message: "OTP Verified", isNewUser: true });
+            }
+        } catch (dbError) {
+            console.error("Database Error during verify:", dbError);
+            res.status(500).json({ success: false, error: dbError.message });
+        }
+    } else {
+        res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+});
+
+// --- Register via Phone ---
+app.post('/api/users/register-phone', async (req, res) => {
+    try {
+        const { phone, name, location, role, farmDetails, bankDetails, buyerDetails } = req.body;
+
+        // 1. Create User (Auto-generate required fields)
+        // Check if user already exists (just in case)
+        let user = await User.findOne({ phone });
+        if (!user) {
+            user = new User({
+                phone,
+                name,
+                username: phone, // Use phone as username
+                email: `${phone.replace('+', '')}@kisansmartapp.com`, // Dummy email
+                password: 'otp-login-authenticated', // Dummy password
+                location: JSON.stringify(location)
+            });
+            await user.save();
+        }
+
+        // 2. Create/Update Profile
+        let bio = '';
+        if (role === 'farmer' && farmDetails) {
+            bio = `Farms ${farmDetails.acres} acres of ${farmDetails.crops.join(', ')}`;
+        } else if (role === 'buyer' && buyerDetails) {
+            bio = `${buyerDetails.subRole === 'business' ? buyerDetails.businessName : 'Consumer'} | Interested in: ${buyerDetails.interests.join(', ')}`;
+        }
+
+        const profileData = {
+            userId: user._id.toString(),
+            role: role || 'farmer',
+            name: name,
+            phone: phone,
+            location: typeof location === 'string' ? location : `${location.village || ''} ${location.district || ''} ${location.state || ''}`.trim(),
+            bio: bio,
+            bankDetails: bankDetails,
+            buyerDetails: buyerDetails, // Save structured buyer details
+            photo: buyerDetails?.storeImage || ''
+        };
+
+        const profile = await Profile.findOneAndUpdate(
+            { userId: user._id.toString(), role: role || 'farmer' },
+            profileData,
+            { new: true, upsert: true }
+        );
+
+        res.status(201).json({ user, profile });
+
+    } catch (err) {
+        console.error("Registration Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // --- Users ---
 app.post('/api/users/register', async (req, res) => {
@@ -143,9 +270,10 @@ app.post('/api/orders/:id/rate', async (req, res) => {
 });
 
 // --- Profile ---
-app.get('/api/profile/:role', async (req, res) => {
+app.get('/api/profile/:userId/:role', async (req, res) => {
     try {
-        const profile = await Profile.findOne({ role: req.params.role });
+        const { userId, role } = req.params;
+        const profile = await Profile.findOne({ userId, role });
         res.json(profile || null);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -155,11 +283,11 @@ app.get('/api/profile/:role', async (req, res) => {
 
 app.post('/api/profile', async (req, res) => {
     try {
-        const { role } = req.body;
-        if (!role) return res.status(400).json({ error: "Role is required" });
+        const { role, userId } = req.body;
+        if (!role || !userId) return res.status(400).json({ error: "Role and UserID are required" });
 
         const profile = await Profile.findOneAndUpdate(
-            { role },
+            { userId, role },
             req.body,
             { new: true, upsert: true }
         );

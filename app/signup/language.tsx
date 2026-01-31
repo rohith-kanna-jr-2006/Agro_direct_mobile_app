@@ -21,15 +21,18 @@ export default function LanguageSelection() {
 
     useEffect(() => {
         playGreetings();
-        return () => Speech.stop();
+        return () => {
+            Speech.stop();
+        };
     }, []);
 
     const playGreetings = async () => {
         // Creating a sequence
-        for (const lang of LANGUAGES.slice(0, 3)) { // Play first 3 to avoid long wait
-            Speech.speak(lang.greeting, { language: lang.code === 'en' ? 'en-US' : undefined });
-            // Note: Speech.speak is fire-and-forget in some versions, but queueing works in others.
-            // We'll just let Expo manage the queue.
+        for (const lang of LANGUAGES.slice(0, 3)) {
+            const voiceOptions = {
+                language: lang.code === 'en' ? 'en-US' : `${lang.code}-IN`,
+            };
+            Speech.speak(lang.greeting, voiceOptions);
         }
     };
 
@@ -45,8 +48,8 @@ export default function LanguageSelection() {
             onPress={() => selectLanguage(item)}
             activeOpacity={0.7}
         >
-            <View style={styles.iconCircle}>
-                <Text style={styles.langChar}>{item.native.charAt(0)}</Text>
+            <View style={[styles.iconCircle, { backgroundColor: item.code === 'en' ? '#E3F2FD' : '#E8F5E9' }]}>
+                <Text style={[styles.langChar, { color: item.code === 'en' ? '#1976D2' : '#2E7D32' }]}>{item.native.charAt(0)}</Text>
             </View>
             <Text style={styles.nativeName}>{item.native}</Text>
             <Text style={styles.englishName}>{item.name}</Text>
@@ -80,75 +83,76 @@ export default function LanguageSelection() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5F9FF',
+        backgroundColor: '#FFFFFF', // Clean white background
         paddingTop: 60,
     },
     header: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 40,
         paddingHorizontal: 20,
     },
     image: {
-        width: 120,
-        height: 120,
-        marginBottom: 10,
+        width: 100,
+        height: 100,
+        marginBottom: 20,
     },
     title: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: '#2C3E50',
+        fontSize: 26,
+        fontWeight: 'bold',
+        color: '#212121',
         textAlign: 'center',
+        marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#7F8C8D',
-        marginTop: 5,
+        color: '#757575',
         textAlign: 'center',
+        fontWeight: '500',
     },
     grid: {
-        paddingHorizontal: 15,
+        paddingHorizontal: 20,
         paddingBottom: 40,
     },
     row: {
         justifyContent: 'space-between',
-        marginBottom: 15,
+        marginBottom: 20,
     },
     card: {
         backgroundColor: '#FFFFFF',
-        width: (SCREEN_WIDTH - 45) / 2, // 2 columns with padding
-        borderRadius: 20,
-        padding: 20,
+        width: (SCREEN_WIDTH - 60) / 2, // 2 columns with 20px padding * 2 sides + 20px gap
+        borderRadius: 24,
+        paddingVertical: 24,
+        paddingHorizontal: 16,
         alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 5,
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 4,
         borderWidth: 1,
-        borderColor: '#EEE',
+        borderColor: '#F0F0F0',
     },
     iconCircle: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#E8F5E9',
+        width: 64,
+        height: 64,
+        borderRadius: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 15,
+        marginBottom: 16,
     },
     langChar: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
-        color: '#2E7D32',
     },
     nativeName: {
         fontSize: 18,
-        fontWeight: '700',
-        color: '#333',
+        fontWeight: 'bold',
+        color: '#212121',
         marginBottom: 4,
     },
     englishName: {
         fontSize: 14,
-        color: '#95A5A6',
+        color: '#9E9E9E',
+        fontWeight: '500',
     },
 });

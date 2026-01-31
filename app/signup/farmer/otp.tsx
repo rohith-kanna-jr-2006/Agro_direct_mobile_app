@@ -1,6 +1,9 @@
+
+import { sendOtp, verifyOtp } from '@/utils/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function OTPVerification() {
     const { mobile } = useLocalSearchParams();
@@ -24,14 +27,47 @@ export default function OTPVerification() {
         }
     };
 
-    const verifyOTP = () => {
+    const handleVerify = async () => {
         const otpString = otp.join('');
         if (otpString.length === 4) {
-            // Mock verification
-            console.log('Verifying OTA:', otpString);
-            router.push('/signup/farmer/personal-details');
+            try {
+                const response = await verifyOtp(mobile as string, otpString, 'farmer');
+
+                if (response.isNewUser) {
+                    // New user, proceed to signup flow with mobile number
+                    router.push({ pathname: '/signup/farmer/personal-details', params: { mobile } });
+                } else if (response.user && response.profile) {
+                    // Existing user AND existing farmer profile -> Login
+                    const userData = response.profile;
+                    await AsyncStorage.setItem('current_user', JSON.stringify(userData));
+                    await AsyncStorage.setItem('user_role', 'farmer');
+                    router.replace('/(tabs)');
+                } else if (response.user && !response.profile) {
+                    // User exists (likely Buyer) but NO Farmer Profile -> Redirect to Farmer Registration
+                    // We pass the name if available to pre-fill
+                    router.push({
+                        pathname: '/signup/farmer/personal-details',
+                        params: { mobile, prefillName: response.user.name || '' }
+                    });
+                } else {
+                    // Fallback
+                    router.push({ pathname: '/signup/farmer/personal-details', params: { mobile } });
+                }
+
+            } catch (error: any) {
+                Alert.alert("Invalid OTP", error.message || "Verification failed");
+            }
         } else {
-            alert("Please enter the complete 4-digit OTP");
+            Alert.alert("Incomplete", "Please enter the complete 4-digit OTP");
+        }
+    };
+
+    const handleResend = async () => {
+        try {
+            await sendOtp(mobile as string);
+            Alert.alert("Sent", "OTP has been resent successfully.");
+        } catch (error: any) {
+            Alert.alert("Error", "Failed to resend OTP");
         }
     };
 
@@ -45,7 +81,7 @@ export default function OTPVerification() {
                     {otp.map((digit, index) => (
                         <TextInput
                             key={index}
-                            ref={el => inputs.current[index] = el}
+                            ref={el => { inputs.current[index] = el; }}
                             style={styles.otpBox}
                             keyboardType="numeric"
                             maxLength={1}
@@ -56,11 +92,11 @@ export default function OTPVerification() {
                     ))}
                 </View>
 
-                <TouchableOpacity style={styles.resendButton}>
+                <TouchableOpacity style={styles.resendButton} onPress={handleResend}>
                     <Text style={styles.resendText}>Resend OTP</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.button} onPress={verifyOTP}>
+                <TouchableOpacity style={styles.button} onPress={handleVerify}>
                     <Text style={styles.buttonText}>Verify & Proceed</Text>
                 </TouchableOpacity>
             </View>

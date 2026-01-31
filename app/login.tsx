@@ -1,3 +1,4 @@
+import { fetchProfile, saveProfile } from '@/utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
@@ -59,6 +60,45 @@ export default function LoginScreen() {
             await AsyncStorage.setItem('user_auth', JSON.stringify(user));
             await AsyncStorage.setItem('user_email', user.email);
             await AsyncStorage.setItem('user_name', user.name);
+
+            // Save as current_user to match profile.tsx expectations and include login type
+            const currentUser = {
+                ...user,
+                userId: user.email, // using email as ID for google login for now
+                type: 'buyer', // Default to buyer for social login if not specified
+                role: 'buyer',
+                photo: user.picture // Map google 'picture' to app 'photo'
+            };
+            await AsyncStorage.setItem('current_user', JSON.stringify(currentUser));
+            await AsyncStorage.setItem('user_role', 'buyer');
+
+            // SYNC WITH BACKEND: Ensure profile exists in DB
+            try {
+                // Check if profile exists for this Google User
+                console.log("Checking backend for Google User:", currentUser.userId);
+                const existingProfile = await fetchProfile(currentUser.userId, 'buyer');
+
+                if (!existingProfile) {
+                    console.log("Creating new profile for Google User...");
+                    await saveProfile({
+                        userId: currentUser.userId,
+                        role: 'buyer',
+                        name: currentUser.name,
+                        email: currentUser.email,
+                        photo: currentUser.picture,
+                        buyerDetails: {
+                            subRole: 'consumer', // Default
+                            interests: []
+                        }
+                    });
+                } else {
+                    console.log("Profile found, syncing local photo...");
+                    // Optional: Update local photo from backend if needed, or vice versa
+                }
+            } catch (err) {
+                console.error("Failed to sync Google User with Backend:", err);
+                // We verify login anyway, but profile page might show defaults until saved again
+            }
 
             // Navigate to Main App
             router.replace('/(tabs)');
