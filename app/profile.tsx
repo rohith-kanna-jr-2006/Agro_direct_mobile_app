@@ -1,4 +1,6 @@
+import { Colors } from '@/constants/theme';
 import { TRANSLATIONS } from '@/constants/translations';
+import { useTheme } from '@/context/ThemeContext';
 import { fetchProfile, saveProfile, sendOtp, verifyOtp } from '@/utils/api';
 import { scheduleNotification } from '@/utils/notifications';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +19,9 @@ const BACKGROUND_COLOR = '#F5F5F5';
 WebBrowser.maybeCompleteAuthSession();
 
 export default function ProfileScreen() {
+    const { theme, preference, setPreference } = useTheme();
+    const colors = Colors[theme];
+
     const params = useLocalSearchParams();
     const router = useRouter();
     const lang = (params.lang as keyof typeof TRANSLATIONS) || 'en';
@@ -132,8 +137,8 @@ export default function ProfileScreen() {
     };
 
     const handleVerifyOtp = async () => {
-        if (!otpCode || otpCode.length !== 6) {
-            Alert.alert("Invalid OTP", "Please enter a 6-digit OTP.");
+        if (!otpCode || otpCode.length < 4) {
+            Alert.alert("Invalid OTP", "Please enter a valid OTP.");
             return;
         }
         try {
@@ -261,12 +266,8 @@ export default function ProfileScreen() {
             const profileData = {
                 userId, // Include the userId in the save payload
                 role, name, storeName, phone, location, bio, photo: photoUrl,
-                bankDetails: {
-                    accountNumber,
-                    ifscCode,
-                    upsId,
-                    bankName
-                },
+                // bankDetails handled separately via secure flow
+                // bankDetails: { ... } removed from here
                 buyerDetails: {
                     subRole,
                     businessName,
@@ -357,8 +358,8 @@ export default function ProfileScreen() {
     }
 
     return (
-        <ScrollView style={styles.container}>
-            <View style={styles.header}>
+        <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.header, { backgroundColor: colors.primary }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="white" />
                 </TouchableOpacity>
@@ -383,6 +384,34 @@ export default function ProfileScreen() {
                         <Ionicons name="swap-horizontal" size={20} color={THEME_COLOR} style={{ marginRight: 8 }} />
                         <Text style={styles.switchText}>Switch to {role === 'farmer' ? 'Buyer' : 'Farmer'} View</Text>
                     </TouchableOpacity>
+                </View>
+
+                {/* Theme Selector */}
+                <View style={[styles.sectionContainer, { borderTopWidth: 0, marginBottom: 20 }]}>
+                    <Text style={[styles.subSectionTitle, { color: colors.text, marginBottom: 10 }]}>App Appearance</Text>
+                    <View style={{ flexDirection: 'row', backgroundColor: colors.inputBackground, padding: 4, borderRadius: 12 }}>
+                        {(['system', 'light', 'dark'] as const).map((mode) => (
+                            <TouchableOpacity
+                                key={mode}
+                                onPress={() => setPreference(mode)}
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 8,
+                                    alignItems: 'center',
+                                    borderRadius: 10,
+                                    backgroundColor: preference === mode ? colors.primary : 'transparent',
+                                }}
+                            >
+                                <Text style={{
+                                    color: preference === mode ? '#fff' : colors.text,
+                                    fontWeight: preference === mode ? 'bold' : 'normal',
+                                    fontSize: 14
+                                }}>
+                                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 </View>
 
                 <Text style={styles.sectionTitle}>{role === 'farmer' ? t.farmer : t.buyer} {t.profile}</Text>
@@ -547,25 +576,28 @@ export default function ProfileScreen() {
                 {/* Bank / Account Details Section */}
                 <Text style={[styles.sectionTitle, { fontSize: 20, marginTop: 10, marginBottom: 15 }]}>Account Details</Text>
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Bank Name</Text>
-                    <TextInput style={styles.input} value={bankName} onChangeText={setBankName} placeholder="e.g. SBI" />
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Account Number</Text>
-                    <TextInput style={styles.input} value={accountNumber} onChangeText={setAccountNumber} keyboardType="numeric" placeholder="XXXXXXXXXXXX" />
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>IFSC Code</Text>
-                    <TextInput style={styles.input} value={ifscCode} onChangeText={setIfscCode} autoCapitalize="characters" placeholder="SBIN000XXXX" />
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>UPI ID</Text>
-                    <TextInput style={styles.input} value={upsId} onChangeText={setUpsId} placeholder="name@upi" />
-                </View>
+                <TouchableOpacity
+                    style={[styles.inputGroup, {
+                        backgroundColor: '#F5F5F5',
+                        padding: 20,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#DDD',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                    }]}
+                    onPress={() => router.push({ pathname: '/manage-bank', params: { role } })}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="card-outline" size={24} color="#666" />
+                        <View style={{ marginLeft: 15 }}>
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333' }}>Manage Bank Account</Text>
+                            <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Update account & IFSC details safely</Text>
+                        </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
+                </TouchableOpacity>
 
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
                     <Text style={styles.saveText}>{t.save}</Text>
@@ -601,7 +633,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: BACKGROUND_COLOR },
+    container: { flex: 1 }, // Dynamic background handled in component
     header: { height: 180, backgroundColor: THEME_COLOR, alignItems: 'center', justifyContent: 'space-between', flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 40, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
     backButton: { marginBottom: 20 },
     avatarContainer: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', marginBottom: -90, elevation: 5 },

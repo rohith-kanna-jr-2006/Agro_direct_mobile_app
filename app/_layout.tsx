@@ -1,10 +1,11 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider, Theme } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { registerForPushNotificationsAsync } from '@/utils/notifications';
 import { useEffect } from 'react';
 
@@ -12,8 +13,34 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+const CustomDarkTheme: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: Colors.dark.tint,
+    background: Colors.dark.background,
+    text: Colors.dark.text,
+    card: Colors.dark.cardBackground,
+    border: Colors.dark.inputBorder,
+    notification: Colors.dark.error,
+  },
+};
+
+const CustomLightTheme: Theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: Colors.light.tint,
+    background: Colors.light.background,
+    text: Colors.light.text,
+    card: Colors.light.cardBackground,
+    border: Colors.light.inputBorder,
+    notification: Colors.light.error,
+  },
+};
+
+function RootLayoutNav() {
+  const { theme } = useTheme();
 
   useEffect(() => {
     registerForPushNotificationsAsync().then(token => {
@@ -23,13 +50,21 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <NavigationThemeProvider value={theme === 'dark' ? CustomDarkTheme : CustomLightTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+      </NavigationThemeProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutNav />
+    </ThemeProvider>
   );
 }

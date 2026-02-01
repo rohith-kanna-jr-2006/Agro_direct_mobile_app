@@ -204,6 +204,50 @@ export const registerUserPhone = async (data: any) => {
     }
 };
 
+// --- Bank APIs ---
+
+export const verifyIfsc = async (ifsc: string) => {
+    try {
+        const res = await fetch(`${API_URL}/verify-ifsc`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ifsc })
+        });
+        const data = await res.json();
+        return data; // { success, details: { bank, branch } }
+    } catch (error) {
+        console.error("API Error verifying IFSC:", error);
+        throw error;
+    }
+};
+
+export const saveBankDetails = async (details: any) => {
+    try {
+        const res = await fetch(`${API_URL}/bank-details`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(details)
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "Failed to save bank details");
+        return data;
+    } catch (error) {
+        console.error("API Error saving bank details:", error);
+        throw error;
+    }
+};
+
+export const fetchBankDetails = async (userId: string, role: string) => {
+    try {
+        const res = await fetch(`${API_URL}/bank-details/${userId}/${role}`);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (error) {
+        console.error("API Error fetching bank details:", error);
+        return null;
+    }
+};
+
 export const verifyPmKisan = async (aadhaar: string) => {
     try {
         const res = await fetch(`${API_URL}/external/verify-pm-kisan`, {

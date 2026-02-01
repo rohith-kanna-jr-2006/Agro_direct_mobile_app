@@ -1,3 +1,5 @@
+import { Colors } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { fetchProfile, saveProfile } from '@/utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
@@ -10,10 +12,11 @@ import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, Vi
 WebBrowser.maybeCompleteAuthSession();
 
 // 2. Constants
-const THEME_COLOR = '#4CAF50';
 const GOOGLE_ICON = 'https://img.icons8.com/color/48/google-logo.png'; // Using a CDN for the icon
 
 export default function LoginScreen() {
+    const { theme } = useTheme();
+    const colors = Colors[theme];
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
@@ -121,23 +124,26 @@ export default function LoginScreen() {
     }
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.header, { backgroundColor: colors.inputBackground }]}>
                 <Image
                     source={{ uri: 'https://img.icons8.com/color/144/tractor.png' }}
                     style={{ width: 100, height: 100, marginBottom: 20 }}
                 />
-                <Text style={styles.title}>Kisan Smart App</Text>
-                <Text style={styles.subtitle}>Empowering Farmers, Connecting Buyers</Text>
+                <Text style={[styles.title, { color: colors.primary }]}>Kisan Smart App</Text>
+                <Text style={[styles.subtitle, { color: colors.icon }]}>Empowering Farmers, Connecting Buyers</Text>
             </View>
 
             <View style={styles.content}>
                 {loading ? (
-                    <ActivityIndicator size="large" color={THEME_COLOR} />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 ) : (
                     <>
                         <TouchableOpacity
-                            style={styles.googleButton}
+                            style={[
+                                styles.googleButton,
+                                { backgroundColor: colors.cardBackground, borderColor: colors.inputBorder }
+                            ]}
                             onPress={() => {
                                 if (request) {
                                     // Debug Alert
@@ -151,11 +157,11 @@ export default function LoginScreen() {
                             }}
                         >
                             <Image source={{ uri: GOOGLE_ICON }} style={styles.icon} />
-                            <Text style={styles.buttonText}>Sign in with Google</Text>
+                            <Text style={[styles.buttonText, { color: colors.text }]}>Sign in with Google</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity onPress={handleBypassLogin} style={{ marginTop: 20 }}>
-                            <Text style={{ color: '#666', textDecorationLine: 'underline' }}>Login as Guest / Demo</Text>
+                            <Text style={{ color: colors.icon, textDecorationLine: 'underline' }}>Login as Guest / Demo</Text>
                         </TouchableOpacity>
                     </>
                 )}
@@ -165,17 +171,15 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
-    header: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#E8F5E9', borderBottomLeftRadius: 50, borderBottomRightRadius: 50 },
+    container: { flex: 1 },
+    header: { flex: 1, justifyContent: 'center', alignItems: 'center', borderBottomLeftRadius: 50, borderBottomRightRadius: 50 },
     content: { flex: 1, padding: 30, alignItems: 'center', marginTop: 50 },
-    title: { fontSize: 32, fontWeight: 'bold', color: THEME_COLOR, marginBottom: 5 },
-    subtitle: { fontSize: 16, color: '#666' },
+    title: { fontSize: 32, fontWeight: 'bold', marginBottom: 5 },
+    subtitle: { fontSize: 16 },
     googleButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'white',
         borderWidth: 1,
-        borderColor: '#ddd',
         padding: 15,
         borderRadius: 30,
         width: '100%',
@@ -187,5 +191,5 @@ const styles = StyleSheet.create({
         shadowRadius: 4
     },
     icon: { width: 24, height: 24, marginRight: 15 },
-    buttonText: { fontSize: 16, color: '#333', fontWeight: 'bold' }
+    buttonText: { fontSize: 16, fontWeight: 'bold' }
 });

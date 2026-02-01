@@ -64,8 +64,9 @@ export default function FarmerLogin() {
                 const response = await sendOtp(mobile);
                 // Use the server message if provided (e.g. for Mock OTP), otherwise default
                 const message = response.message || `Verification code sent to +91 ${mobile}`;
-                Alert.alert("OTP Sent", message);
-                router.push({ pathname: '/signup/farmer/otp', params: { mobile } });
+                Alert.alert("OTP Sent", message, [
+                    { text: "OK", onPress: () => router.push({ pathname: '/signup/farmer/otp', params: { mobile } }) }
+                ]);
             } catch (error: any) {
                 Alert.alert("Error", error.message || "Failed to send OTP");
             }

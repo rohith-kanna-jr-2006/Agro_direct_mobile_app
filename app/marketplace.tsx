@@ -1,4 +1,6 @@
+import { Colors } from '@/constants/theme';
 import { TRANSLATIONS } from '@/constants/translations';
+import { useTheme } from '@/context/ThemeContext';
 import { fetchProducts } from '@/utils/api';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -6,13 +8,10 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-// Removed Mock Data
-// const MARKETPLACE_ITEMS = ... 
-
-
-const THEME_COLOR = '#4CAF50';
-
 export default function MarketplaceScreen() {
+    const { theme } = useTheme();
+    const colors = Colors[theme];
+
     const params = useLocalSearchParams();
     const lang = (params.lang as keyof typeof TRANSLATIONS) || 'en';
     const t = TRANSLATIONS[lang];
@@ -93,9 +92,9 @@ export default function MarketplaceScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { backgroundColor: colors.primary }]}>
                 <View>
                     <Text style={styles.locationLabel}>Current Location</Text>
                     <View style={styles.locationRow}>
@@ -112,21 +111,22 @@ export default function MarketplaceScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color="#757575" />
+                <View style={[styles.searchContainer, { backgroundColor: colors.cardBackground }]}>
+                    <Ionicons name="search" size={20} color={colors.icon} />
                     <TextInput
-                        style={styles.searchInput}
+                        style={[styles.searchInput, { color: colors.text }]}
                         placeholder="Search 'Fresh Tomatoes'..."
+                        placeholderTextColor={colors.icon}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         onSubmitEditing={() => console.log('Search Triggered')}
                         returnKeyType="search"
                     />
                     <TouchableOpacity onPress={() => router.push('/chat-order')} style={{ marginRight: 10 }}>
-                        <Ionicons name="mic" size={22} color={THEME_COLOR} />
+                        <Ionicons name="mic" size={22} color={colors.tint} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => router.push('/smart-order')}>
-                        <Ionicons name="arrow-forward-circle" size={28} color={THEME_COLOR} />
+                        <Ionicons name="arrow-forward-circle" size={28} color={colors.tint} />
                     </TouchableOpacity>
                 </View>
 
@@ -135,16 +135,22 @@ export default function MarketplaceScreen() {
                     {FILTERS.map((f, i) => (
                         <TouchableOpacity
                             key={i}
-                            style={[styles.filterChip, activeFilter === f && styles.activeChip]}
+                            style={[
+                                styles.filterChip,
+                                { backgroundColor: activeFilter === f ? colors.tint : colors.inputBackground }
+                            ]}
                             onPress={() => setActiveFilter(f)}
                         >
-                            <Text style={[styles.filterText, activeFilter === f && styles.activeFilterText]}>{f}</Text>
+                            <Text style={[
+                                styles.filterText,
+                                { color: activeFilter === f ? '#FFF' : colors.text }
+                            ]}>{f}</Text>
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
 
                 {/* Grid Title */}
-                <Text style={styles.sectionHeader}>Fresh Recommendations</Text>
+                <Text style={[styles.sectionHeader, { color: colors.text }]}>Fresh Recommendations</Text>
 
                 {/* Product Grid */}
                 <View style={styles.productGrid}>
@@ -156,7 +162,7 @@ export default function MarketplaceScreen() {
                             return (
                                 <TouchableOpacity
                                     key={item._id || item.id}
-                                    style={styles.productCard}
+                                    style={[styles.productCard, { backgroundColor: colors.cardBackground }]}
                                     onPress={() => placeOrder(item)}
                                 >
                                     <Image source={{ uri: item.image }} style={styles.productImage} />
@@ -167,11 +173,11 @@ export default function MarketplaceScreen() {
                                     </View>
 
                                     <View style={styles.cardContent}>
-                                        <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                                        <Text style={styles.productPrice}>{item.price}</Text>
+                                        <Text style={[styles.productName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+                                        <Text style={[styles.productPrice, { color: colors.tint }]}>{item.price}</Text>
 
                                         <View style={styles.metaRow}>
-                                            <Ionicons name="location-sharp" size={12} color="#999" />
+                                            <Ionicons name="location-sharp" size={12} color={colors.icon} />
                                             <Text style={styles.distanceText}> {item.distance}</Text>
                                         </View>
                                     </View>
@@ -202,9 +208,8 @@ export default function MarketplaceScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FA' },
+    container: { flex: 1 },
     header: {
-        backgroundColor: THEME_COLOR,
         paddingTop: 50,
         paddingBottom: 20,
         paddingHorizontal: 20,
@@ -225,7 +230,6 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF',
         marginHorizontal: 20,
         marginTop: -25, // Overlap header
         borderRadius: 12,
@@ -241,14 +245,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        backgroundColor: '#E0E0E0',
         marginRight: 10,
     },
-    activeChip: { backgroundColor: THEME_COLOR },
-    filterText: { color: '#333', fontSize: 14 },
+    filterText: { fontSize: 14 },
     activeFilterText: { color: '#FFF', fontWeight: 'bold' },
 
-    sectionHeader: { fontSize: 20, fontWeight: 'bold', marginHorizontal: 20, marginTop: 25, marginBottom: 15, color: '#333' },
+    sectionHeader: { fontSize: 20, fontWeight: 'bold', marginHorizontal: 20, marginTop: 25, marginBottom: 15 },
 
     productGrid: {
         flexDirection: 'row',
@@ -258,7 +260,6 @@ const styles = StyleSheet.create({
     },
     productCard: {
         width: '48%',
-        backgroundColor: '#FFF',
         borderRadius: 15,
         marginBottom: 15,
         overflow: 'hidden',
@@ -270,7 +271,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 8,
         left: 8,
-        backgroundColor: '#E8F5E9',
+        backgroundColor: '#E8F5E9', // Keep green for badge as it implies 'fresh/organic' usually
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 4,
@@ -280,8 +281,8 @@ const styles = StyleSheet.create({
     gradeText: { fontSize: 10, fontWeight: 'bold', color: '#2E7D32' },
 
     cardContent: { padding: 12 },
-    productName: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4 },
-    productPrice: { fontSize: 16, fontWeight: 'bold', color: THEME_COLOR },
+    productName: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+    productPrice: { fontSize: 16, fontWeight: 'bold' },
     metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
     distanceText: { fontSize: 12, color: '#999' },
 
