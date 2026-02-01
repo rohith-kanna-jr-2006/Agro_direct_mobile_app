@@ -50,13 +50,19 @@ export default function PersonalDetails() {
 
             if (reverseGeocode.length > 0) {
                 const place = reverseGeocode[0];
+                console.log("Geocode Result:", place);
+
+                // Robust mapping
                 setAddress({
-                    state: place.region || place.subregion || '',
+                    state: place.region || '',
                     district: place.subregion || place.city || '',
-                    village: place.district || place.street || '' // Approximation
+                    // 'district' in Expo Location is sometimes the neighborhood. 
+                    // 'street' or 'name' is usually the specific spot.
+                    village: place.district || place.street || place.name || ''
                 });
             }
         } catch (error) {
+            console.error(error);
             Alert.alert("Error", "Could not fetch location.");
         } finally {
             setLoadingLoc(false);

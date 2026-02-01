@@ -187,6 +187,7 @@ export const verifyOtp = async (phone: string, code: string, role?: string) => {
     }
 };
 
+
 export const registerUserPhone = async (data: any) => {
     try {
         const res = await fetch(`${API_URL}/users/register-phone`, {
@@ -199,6 +200,21 @@ export const registerUserPhone = async (data: any) => {
         return result;
     } catch (error) {
         console.error("API Error registering user:", error);
+        throw error;
+    }
+};
+
+export const verifyPmKisan = async (aadhaar: string) => {
+    try {
+        const res = await fetch(`${API_URL}/external/verify-pm-kisan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ aadhaar })
+        });
+        const data = await res.json();
+        return data; // Returns { success: true, valid: boolean, message: string }
+    } catch (error) {
+        console.error("API Error verifying Aadhaar:", error);
         throw error;
     }
 };

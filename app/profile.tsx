@@ -1,15 +1,20 @@
 import { TRANSLATIONS } from '@/constants/translations';
-import { fetchProfile, saveProfile } from '@/utils/api';
+import { fetchProfile, saveProfile, sendOtp, verifyOtp } from '@/utils/api';
 import { scheduleNotification } from '@/utils/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Google from 'expo-auth-session/providers/google';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+
 const THEME_COLOR = '#4CAF50';
 const BACKGROUND_COLOR = '#F5F5F5';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function ProfileScreen() {
     const params = useLocalSearchParams();
@@ -45,6 +50,105 @@ export default function ProfileScreen() {
     const [businessName, setBusinessName] = useState('');
     const [interests, setInterests] = useState<string[]>([]);
     const [weeklyRequirement, setWeeklyRequirement] = useState('');
+
+    // Verification State
+    const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+    const [showOtpInput, setShowOtpInput] = useState(false);
+    const [otpCode, setOtpCode] = useState('');
+    const [otpTimer, setOtpTimer] = useState(0);
+
+    // Google Auth Request
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        webClientId: "80509016220-5kmi60qgsdo4ok2ngvjil8t9ip831uu9.apps.googleusercontent.com",
+        androidClientId: "80509016220-5kmi60qgsdo4ok2ngvjil8t9ip831uu9.apps.googleusercontent.com",
+        redirectUri: "https://auth.expo.io/@anonymous/KisanSmartApp"
+    });
+
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { authentication } = response;
+            if (authentication?.accessToken) {
+                // Determine if we want to fetch user info or just mark as linked
+                // For now, let's just fetch to get the email and verify
+                fetchGoogleUserInfo(authentication.accessToken);
+            }
+        }
+    }, [response]);
+
+    useEffect(() => {
+        let interval: any;
+        if (otpTimer > 0) {
+            interval = setInterval(() => {
+                setOtpTimer((prev) => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [otpTimer]);
+
+    const fetchGoogleUserInfo = async (token: string) => {
+        try {
+            const res = await fetch("https://www.googleapis.com/userinfo/v2/me", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const user = await res.json();
+
+            // Logic to link:
+            // 1. If email field is empty, fill it.
+            // 2. Set isGoogleLinked to true.
+            // 3. Save auth token/user to storage so it persists as "linked"
+            setIsGoogleLinked(true);
+            if (!email) setEmail(user.email);
+
+            // Construct auth object to save
+            const authObj = {
+                ...user,
+                accessToken: token
+            };
+            await AsyncStorage.setItem('user_auth', JSON.stringify(authObj));
+
+            Alert.alert("Success", "Google Account Linked Successfully!");
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "Failed to link Google account.");
+        }
+    };
+
+    const handleSendOtp = async () => {
+        if (!phone || phone.length < 10) {
+            Alert.alert("Invalid Phone", "Please enter a valid phone number.");
+            return;
+        }
+        try {
+            setLoading(true);
+            const response = await sendOtp(phone);
+            setLoading(false);
+            setShowOtpInput(true);
+            setOtpTimer(60); // 60 seconds cooldown
+            Alert.alert("OTP Sent", response.message || `An OTP has been sent to ${phone}`);
+        } catch (error: any) {
+            setLoading(false);
+            Alert.alert("Error", error.message || "Failed to send OTP");
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (!otpCode || otpCode.length !== 6) {
+            Alert.alert("Invalid OTP", "Please enter a 6-digit OTP.");
+            return;
+        }
+        try {
+            setLoading(true);
+            await verifyOtp(phone, otpCode, role); // Passing role if needed by backend, though verification usually role-agnostic
+            setLoading(false);
+            setIsPhoneVerified(true);
+            setShowOtpInput(false);
+            setOtpCode('');
+            Alert.alert("Success", "Phone Number Verified!");
+        } catch (error: any) {
+            setLoading(false);
+            Alert.alert("Verification Failed", error.message || "Invalid OTP");
+        }
+    };
 
     // Initial Role Check: If no param, try to load from storage
     useEffect(() => {
@@ -112,6 +216,13 @@ export default function ProfileScreen() {
                             setInterests(buyerDetails.interests || []);
                             setWeeklyRequirement(buyerDetails.weeklyRequirement || '');
                         }
+
+                        // Check if phone matches the one in profile to consider it verified initially?
+                        // Or better, if backend sends isVerified flag. Assuming backend might not have it yet.
+                        // If phone exists in profile, we can assume it was verified or just mark as unverified if changed.
+                        // For now, if loading from profile, we can optimistically set verified if phone is present.
+                        if (phone) setIsPhoneVerified(true);
+
                         return; // Successfully loaded real data
                     }
                 }
@@ -291,11 +402,22 @@ export default function ProfileScreen() {
                             editable={!isGoogleLinked}
                             placeholder="your@email.com"
                         />
-                        {isGoogleLinked && (
+                        {isGoogleLinked ? (
                             <View style={{ marginLeft: 10, alignItems: 'center', justifyContent: 'center' }}>
                                 <Image source={{ uri: 'https://img.icons8.com/color/48/google-logo.png' }} style={{ width: 24, height: 24 }} />
                                 <Text style={{ fontSize: 10, color: '#4CAF50', fontWeight: 'bold' }}>Linked</Text>
                             </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={{ marginLeft: 10, backgroundColor: '#fff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', alignItems: 'center', justifyContent: 'center' }}
+                                onPress={() => {
+                                    if (request) promptAsync();
+                                    else Alert.alert("Error", "Google Auth not configured");
+                                }}
+                            >
+                                <Image source={{ uri: 'https://img.icons8.com/color/48/google-logo.png' }} style={{ width: 20, height: 20 }} />
+                                <Text style={{ fontSize: 10, color: '#333' }}>Link</Text>
+                            </TouchableOpacity>
                         )}
                     </View>
                 </View>
@@ -366,8 +488,56 @@ export default function ProfileScreen() {
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>{t.phone}</Text>
-                    <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <TextInput
+                            style={[styles.input, { flex: 1 }]}
+                            value={phone}
+                            onChangeText={(text) => {
+                                setPhone(text);
+                                setIsPhoneVerified(false); // Reset verification on change
+                            }}
+                            keyboardType="phone-pad"
+                        />
+                        {isPhoneVerified ? (
+                            <View style={{ marginLeft: 10, alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                                <Text style={{ fontSize: 10, color: '#4CAF50', fontWeight: 'bold' }}>Verified</Text>
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={{ marginLeft: 10, backgroundColor: THEME_COLOR, paddingHorizontal: 15, paddingVertical: 12, borderRadius: 10 }}
+                                onPress={handleSendOtp}
+                                disabled={otpTimer > 0}
+                            >
+                                <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                                    {otpTimer > 0 ? `${otpTimer}s` : 'Verify'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
+
+                {showOtpInput && !isPhoneVerified && (
+                    <View style={[styles.inputGroup, { marginTop: -10, backgroundColor: '#E8F5E9', padding: 15, borderRadius: 10 }]}>
+                        <Text style={{ fontSize: 14, color: '#333', marginBottom: 10 }}>Enter OTP sent to {phone}</Text>
+                        <View style={{ flexDirection: 'row' }}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, backgroundColor: 'white' }]}
+                                value={otpCode}
+                                onChangeText={setOtpCode}
+                                placeholder="123456"
+                                keyboardType="number-pad"
+                                maxLength={6}
+                            />
+                            <TouchableOpacity
+                                style={{ marginLeft: 10, backgroundColor: '#333', paddingHorizontal: 20, justifyContent: 'center', borderRadius: 10 }}
+                                onPress={handleVerifyOtp}
+                            >
+                                <Text style={{ color: 'white', fontWeight: 'bold' }}>Submit</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>{t.location}</Text>

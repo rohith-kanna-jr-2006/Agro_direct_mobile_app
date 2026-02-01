@@ -27,21 +27,11 @@ export default function FarmerLogin() {
     });
 
     useEffect(() => {
-        // DEBUG: Remove this after configuring Google Cloud Console
-        if (request) {
-            console.log("Redirect URI:", request.redirectUri);
-            // Alert.alert("Setup Required", `Please add this Redirect URI to your Google Cloud Console:\n\n${request.redirectUri}`);
-        }
-    }, [request]);
-
-    useEffect(() => {
         if (response?.type === 'success') {
             const { authentication } = response;
             if (authentication?.accessToken) {
                 getUserInfo(authentication.accessToken);
             }
-        } else if (response?.type === 'error') {
-            Alert.alert("Authentication Error", "Please ensure your Redirect URI is configured in Google Cloud Console.");
         }
     }, [response]);
 
@@ -71,8 +61,10 @@ export default function FarmerLogin() {
     const handleGetOTP = async () => {
         if (mobile.length === 10) {
             try {
-                await sendOtp(mobile);
-                Alert.alert("OTP Sent", `Verification code sent to +91 ${mobile}`);
+                const response = await sendOtp(mobile);
+                // Use the server message if provided (e.g. for Mock OTP), otherwise default
+                const message = response.message || `Verification code sent to +91 ${mobile}`;
+                Alert.alert("OTP Sent", message);
                 router.push({ pathname: '/signup/farmer/otp', params: { mobile } });
             } catch (error: any) {
                 Alert.alert("Error", error.message || "Failed to send OTP");

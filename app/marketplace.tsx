@@ -53,39 +53,29 @@ export default function MarketplaceScreen() {
         }
     };
 
-    const [messages, setMessages] = useState([
-        { id: 1, text: "Is available?", sender: "buyer" },
-        { id: 2, text: "Yes.", sender: "system" }
-    ]);
-    const [input, setInput] = useState("");
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeFilter, setActiveFilter] = useState('Nearest');
 
-    const sendMessage = () => {
-        if (!input.trim()) return;
-        setMessages([...messages, { id: Date.now(), text: input, sender: "buyer" }]);
-        setInput("");
-        setTimeout(() => {
-            setMessages(prev => [...prev, { id: Date.now() + 1, text: "OK.", sender: "system" }]);
-        }, 1000);
-    };
+    const FILTERS = ["Nearest", "Lowest Price", "Organic", "Bulk Available"];
+
+    // Mock wrapper to add missing UI fields if backend doesn't have them yet
+    const getDisplayItem = (item: any) => ({
+        ...item,
+        grade: item.grade || 'Grade A',
+        distance: item.distance || `${Math.floor(Math.random() * 10) + 1} km`
+    });
 
     const router = useRouter();
 
     const placeOrder = (item: any) => {
         if (userInfo?.id === 'guest') {
-            // Use React Native Alert
             const { Alert } = require('react-native');
-            Alert.alert(
-                "Guest Mode Restricted",
-                "You cannot place orders in Guest Mode. Please login.",
-                [
-                    { text: "OK" }
-                ]
-            );
+            Alert.alert("Guest Mode Restricted", "You cannot place orders in Guest Mode. Please login.", [{ text: "OK" }]);
             return;
         }
 
         router.push({
-            pathname: '/checkout',
+            pathname: '/product-details',
             params: {
                 id: item._id || item.id,
                 name: item.name,
@@ -94,79 +84,232 @@ export default function MarketplaceScreen() {
                 farmerContact: item.farmerContact,
                 farmerAddress: item.farmerAddress,
                 rating: item.rating,
+                grade: item.grade,
+                distance: item.distance,
+                image: item.image,
                 lang
             }
         });
     };
 
     return (
-        <ScrollView style={styles.container}>
-            <Text style={styles.sectionHeader}>{t.marketTitle}</Text>
-            <View style={styles.marketGrid}>
-                {marketItems.length === 0 ? (
-                    <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>No products available in the market.</Text>
-                ) : (
-                    marketItems.map((item) => (
-                        <View key={item._id || item.id} style={styles.marketCard}>
-                            <Image source={{ uri: item.image }} style={styles.marketImage} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.marketName}>{item.name}</Text>
-                                <Text style={styles.marketPrice}>{item.price}</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={[styles.orderButton, userInfo?.id === 'guest' && { backgroundColor: '#ccc' }]}
-                                onPress={() => placeOrder(item)}
-                            >
-                                <Text style={styles.orderButtonText}>{userInfo?.id === 'guest' ? "Login to Order" : t.placeOrder}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ))
-                )}
+        <View style={styles.container}>
+            {/* Header */}
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.locationLabel}>Current Location</Text>
+                    <View style={styles.locationRow}>
+                        <Ionicons name="location" size={18} color="#FFF" />
+                        <Text style={styles.locationText}> Coimbatore, TN</Text>
+                        <Ionicons name="chevron-down" size={16} color="#FFF" />
+                    </View>
+                </View>
+                <TouchableOpacity style={styles.iconBtn}>
+                    <Ionicons name="notifications-outline" size={24} color="#FFF" />
+                    <View style={styles.badge} />
+                </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionHeader}>{t.chat}</Text>
-            <View style={styles.chatContainer}>
-                <View style={styles.chatList}>
-                    {messages.map((msg) => (
-                        <View key={msg.id} style={[styles.messageBubble, msg.sender === 'buyer' ? styles.myMsg : styles.sysMsg]}>
-                            <Text style={msg.sender === 'buyer' ? styles.myMsgText : styles.sysMsgText}>{msg.text}</Text>
-                        </View>
-                    ))}
-                </View>
-                <View style={styles.chatInputRow}>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <Ionicons name="search" size={20} color="#757575" />
                     <TextInput
-                        style={styles.chatInput}
-                        value={input}
-                        onChangeText={setInput}
-                        placeholder={t.typeMsg}
+                        style={styles.searchInput}
+                        placeholder="Search 'Fresh Tomatoes'..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        onSubmitEditing={() => console.log('Search Triggered')}
+                        returnKeyType="search"
                     />
-                    <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-                        <Ionicons name="send" size={20} color="white" />
+                    <TouchableOpacity onPress={() => router.push('/chat-order')} style={{ marginRight: 10 }}>
+                        <Ionicons name="mic" size={22} color={THEME_COLOR} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => router.push('/smart-order')}>
+                        <Ionicons name="arrow-forward-circle" size={28} color={THEME_COLOR} />
                     </TouchableOpacity>
                 </View>
-            </View>
-        </ScrollView>
+
+                {/* Filters */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                    {FILTERS.map((f, i) => (
+                        <TouchableOpacity
+                            key={i}
+                            style={[styles.filterChip, activeFilter === f && styles.activeChip]}
+                            onPress={() => setActiveFilter(f)}
+                        >
+                            <Text style={[styles.filterText, activeFilter === f && styles.activeFilterText]}>{f}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+
+                {/* Grid Title */}
+                <Text style={styles.sectionHeader}>Fresh Recommendations</Text>
+
+                {/* Product Grid */}
+                <View style={styles.productGrid}>
+                    {marketItems.length === 0 ? (
+                        <Text style={styles.emptyText}>No products found.</Text>
+                    ) : (
+                        marketItems.map((rawItem) => {
+                            const item = getDisplayItem(rawItem);
+                            return (
+                                <TouchableOpacity
+                                    key={item._id || item.id}
+                                    style={styles.productCard}
+                                    onPress={() => placeOrder(item)}
+                                >
+                                    <Image source={{ uri: item.image }} style={styles.productImage} />
+
+                                    {/* AI Grade Badge */}
+                                    <View style={styles.gradeBadge}>
+                                        <Text style={styles.gradeText}>{item.grade}</Text>
+                                    </View>
+
+                                    <View style={styles.cardContent}>
+                                        <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+                                        <Text style={styles.productPrice}>{item.price}</Text>
+
+                                        <View style={styles.metaRow}>
+                                            <Ionicons name="location-sharp" size={12} color="#999" />
+                                            <Text style={styles.distanceText}> {item.distance}</Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })
+                    )}
+                </View>
+            </ScrollView>
+
+            {/* Floating Action Button */}
+            {/* Ask AI FAB (Left) */}
+            <TouchableOpacity
+                style={styles.aiFab}
+                onPress={() => router.push('/chat-order')}
+            >
+                <Ionicons name="chatbubble-ellipses" size={26} color="white" />
+                <Text style={styles.fabText}>Ask AI</Text>
+            </TouchableOpacity>
+
+            {/* Post Request FAB (Right) */}
+            <TouchableOpacity style={styles.fab}>
+                <Ionicons name="add" size={30} color="white" />
+                <Text style={styles.fabText}>Post Req</Text>
+            </TouchableOpacity>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F5F5F5' },
-    sectionHeader: { fontSize: 22, fontWeight: 'bold', marginLeft: 20, marginTop: 20, marginBottom: 10, color: '#333' },
-    marketGrid: { paddingHorizontal: 10 },
-    marketCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 15, marginBottom: 10, borderRadius: 15, marginHorizontal: 10, shadowColor: '#000', shadowOpacity: 0.05, elevation: 2 },
-    marketImage: { width: 60, height: 60, marginRight: 15 },
-    marketName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-    marketPrice: { fontSize: 16, color: THEME_COLOR, fontWeight: 'bold', marginTop: 4 },
-    orderButton: { backgroundColor: THEME_COLOR, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, minWidth: 100, alignItems: 'center' },
-    orderButtonText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
-    chatContainer: { backgroundColor: 'white', margin: 20, borderRadius: 20, padding: 15, height: 300, shadowColor: '#000', shadowOpacity: 0.05, elevation: 2 },
-    chatList: { flex: 1 },
-    messageBubble: { padding: 10, borderRadius: 15, marginBottom: 10, maxWidth: '80%' },
-    myMsg: { backgroundColor: THEME_COLOR, alignSelf: 'flex-end', borderBottomRightRadius: 2 },
-    sysMsg: { backgroundColor: '#F0F0F0', alignSelf: 'flex-start', borderBottomLeftRadius: 2 },
-    myMsgText: { color: 'white' },
-    sysMsgText: { color: '#333' },
-    chatInputRow: { flexDirection: 'row', marginTop: 10, alignItems: 'center' },
-    chatInput: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, marginRight: 10 },
-    sendButton: { backgroundColor: THEME_COLOR, width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+    container: { flex: 1, backgroundColor: '#F8F9FA' },
+    header: {
+        backgroundColor: THEME_COLOR,
+        paddingTop: 50,
+        paddingBottom: 20,
+        paddingHorizontal: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+    },
+    locationLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
+    locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    locationText: { color: '#FFF', fontSize: 16, fontWeight: 'bold', marginRight: 5 },
+    iconBtn: { padding: 5, position: 'relative' },
+    badge: { position: 'absolute', top: 5, right: 5, width: 8, height: 8, borderRadius: 4, backgroundColor: 'red' },
+
+    scrollContent: { paddingBottom: 100 },
+
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        marginHorizontal: 20,
+        marginTop: -25, // Overlap header
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        height: 50,
+        elevation: 4,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4
+    },
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
+
+    filterScroll: { marginTop: 20, paddingHorizontal: 20, maxHeight: 40 },
+    filterChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#E0E0E0',
+        marginRight: 10,
+    },
+    activeChip: { backgroundColor: THEME_COLOR },
+    filterText: { color: '#333', fontSize: 14 },
+    activeFilterText: { color: '#FFF', fontWeight: 'bold' },
+
+    sectionHeader: { fontSize: 20, fontWeight: 'bold', marginHorizontal: 20, marginTop: 25, marginBottom: 15, color: '#333' },
+
+    productGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        paddingHorizontal: 15, // Gap handling
+    },
+    productCard: {
+        width: '48%',
+        backgroundColor: '#FFF',
+        borderRadius: 15,
+        marginBottom: 15,
+        overflow: 'hidden',
+        elevation: 3,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3
+    },
+    productImage: { width: '100%', height: 120, resizeMode: 'cover' },
+    gradeBadge: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        backgroundColor: '#E8F5E9',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#4CAF50'
+    },
+    gradeText: { fontSize: 10, fontWeight: 'bold', color: '#2E7D32' },
+
+    cardContent: { padding: 12 },
+    productName: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4 },
+    productPrice: { fontSize: 16, fontWeight: 'bold', color: THEME_COLOR },
+    metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+    distanceText: { fontSize: 12, color: '#999' },
+
+    emptyText: { textAlign: 'center', marginTop: 40, width: '100%', color: '#999' },
+
+    fab: {
+        position: 'absolute',
+        bottom: 20,
+        right: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FF9800',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 30,
+        elevation: 6
+    },
+    fabText: { color: '#FFF', fontWeight: 'bold', marginLeft: 5 },
+    aiFab: {
+        position: 'absolute',
+        bottom: 20,
+        left: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#2196F3', // Blue for AI
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 30,
+        elevation: 6
+    }
 });

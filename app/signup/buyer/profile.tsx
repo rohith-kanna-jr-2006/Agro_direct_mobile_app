@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function BuyerProfile() {
     const [subRole, setSubRole] = useState<string | null>(null);
@@ -14,6 +15,7 @@ export default function BuyerProfile() {
     const [name, setName] = useState('');
     const [address, setAddress] = useState('');
     const [businessName, setBusinessName] = useState('');
+    const [locationLoading, setLocationLoading] = useState(false);
 
     useEffect(() => {
         AsyncStorage.getItem('user_sub_role').then(r => {
@@ -34,6 +36,50 @@ export default function BuyerProfile() {
         }
     };
 
+    const getCurrentLocation = async () => {
+        setLocationLoading(true);
+        try {
+            let { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission to access location was denied');
+                setLocationLoading(false);
+                return;
+            }
+
+            let location = await Location.getCurrentPositionAsync({});
+
+            // Reverse Geocode to get address
+            let reverseGeocode = await Location.reverseGeocodeAsync({
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude
+            });
+
+            if (reverseGeocode.length > 0) {
+                const addr = reverseGeocode[0];
+                // Construct a readable address string
+                const formattedAddress = [
+                    addr.name,
+                    addr.street,
+                    addr.city,
+                    addr.district,
+                    addr.region,
+                    addr.postalCode
+                ].filter(Boolean).join(', ');
+
+                setAddress(formattedAddress);
+            } else {
+                // Fallback if reverse geocode fails logic but we have coords
+                setAddress(`${location.coords.latitude}, ${location.coords.longitude}`);
+            }
+
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "Could not fetch location");
+        } finally {
+            setLocationLoading(false);
+        }
+    };
+
     if (loading) return <View style={styles.center}><ActivityIndicator /></View>;
 
     const isBusiness = subRole !== 'consumer';
@@ -50,10 +96,21 @@ export default function BuyerProfile() {
                 <TextInput style={styles.input} placeholder="John Doe" value={name} onChangeText={setName} />
 
                 <Text style={styles.label}>Address</Text>
-                <TextInput style={styles.input} placeholder="Start typing address..." value={address} onChangeText={setAddress} />
-                <TouchableOpacity style={styles.locationBtn}>
-                    <Ionicons name="location-sharp" size={18} color="#2575FC" />
-                    <Text style={styles.locationText}>Use Current Location</Text>
+                <TextInput style={styles.input} placeholder="Start typing address..." value={address} onChangeText={setAddress} multiline />
+
+                <TouchableOpacity
+                    style={styles.locationBtn}
+                    onPress={getCurrentLocation}
+                    disabled={locationLoading}
+                >
+                    {locationLoading ? (
+                        <ActivityIndicator size="small" color="#2575FC" />
+                    ) : (
+                        <>
+                            <Ionicons name="location-sharp" size={18} color="#2575FC" />
+                            <Text style={styles.locationText}>Use Current Location</Text>
+                        </>
+                    )}
                 </TouchableOpacity>
 
                 {isBusiness && (

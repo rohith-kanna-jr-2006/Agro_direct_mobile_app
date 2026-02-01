@@ -358,6 +358,32 @@ app.get('/api/analytics', async (req, res) => {
     }
 });
 
+
+// --- External API Integrations (Mock) ---
+app.post('/api/external/verify-pm-kisan', async (req, res) => {
+    const { aadhaar } = req.body;
+    console.log(`Verifying PM-KISAN status for Aadhaar: ${aadhaar}`);
+
+    // Mock Logic: Aadhaar ending in '0000' fails. All others valid.
+    if (aadhaar && aadhaar.endsWith('0000')) {
+        return res.json({ success: true, valid: false, message: "Landholding not found in PM-KISAN database." });
+    }
+
+    // Simulate delay for realism
+    setTimeout(() => {
+        res.json({
+            success: true,
+            valid: true,
+            message: "Verified successfully against PM-KISAN database.",
+            details: {
+                farmerName: "Verified Generic Farmer", // In real app, name would match Aadhaar
+                landSize: "2.5 Acres",
+                status: "Active Beneficiary"
+            }
+        });
+    }, 1500);
+});
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });

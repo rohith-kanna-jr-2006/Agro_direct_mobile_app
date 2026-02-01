@@ -2,8 +2,9 @@ import { TRANSLATIONS } from '@/constants/translations';
 import { saveOrder } from '@/utils/api';
 import { scheduleNotification } from '@/utils/notifications';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const THEME_COLOR = '#4CAF50';
@@ -39,7 +40,7 @@ export default function CheckoutScreen() {
         rating: params.rating as string || '4.0'
     };
 
-    console.log("Checkout Params:", params);
+    // console.log("Checkout Params:", params);
 
     // Parse price per unit
     const pricePerUnit = parseInt(product.price?.replace(/[^0-9]/g, '') || '0');
@@ -49,7 +50,30 @@ export default function CheckoutScreen() {
     const [address, setAddress] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi'>('cod');
 
-    const total = pricePerUnit * (parseInt(quantity) || 0);
+    useEffect(() => {
+        const loadUserDetails = async () => {
+            try {
+                const userJson = await AsyncStorage.getItem('current_user');
+                if (userJson) {
+                    const user = JSON.parse(userJson);
+                    if (user.name) setName(user.name);
+                    if (user.location) setAddress(user.location);
+                    else if (user.address) setAddress(user.address);
+                }
+            } catch (error) {
+                console.error("Failed to load user details", error);
+            }
+        };
+        loadUserDetails();
+    }, []);
+
+    // Use passed total if available (from Cart) or calculate locally
+    const cartTotal = params.totalPrice ? parseFloat(params.totalPrice as string) : null;
+    const deliveryFee = params.deliveryCost ? parseFloat(params.deliveryCost as string) : 0;
+
+    // Fallback calculation if coming directly regular flow (though new flow goes via Cart)
+    const itemTotal = pricePerUnit * (parseInt(quantity) || 0);
+    const finalTotal = cartTotal || (itemTotal + deliveryFee); // If delivery fee logic wasn't in direct flow, it might be 0.
 
     const handleOrder = async () => {
         if (!name || !address || !quantity) {
@@ -60,23 +84,15 @@ export default function CheckoutScreen() {
         const newOrder = {
             productName: product.name,
             quantity: parseInt(quantity),
-            totalPrice: total,
+            totalPrice: finalTotal,
             date: new Date().toISOString(),
             farmer: {
                 name: product.farmerName,
                 address: product.farmerAddress,
                 rating: product.rating
             },
-            userName: name,     // Schema might not have this, but good to send
-            userAddress: address // Schema didn't have this explicit in top level? 
-            // My Order Schema: productName, totalPrice, quantity, date, farmer, userRating, userId. 
-            // It misses delivery address! 
-            // That's a schema oversight. I should probably add address to Order schema.
-            // But strict Schema will ignore it. 
-            // For now I'll persist it however I can or update schema.
-            // I'll update schema later if strictly needed, but for "store data in mongodb", this fulfills the data movement.
-            // Actually, losing the delivery address is bad. 
-            // I should update Order.js schema to include user details.
+            userName: name,
+            userAddress: address
         };
 
         try {
@@ -85,13 +101,16 @@ export default function CheckoutScreen() {
             // Schedule notification
             scheduleNotification("Order Placed Successfully", `Your order for ${product.name} has been confirmed!`);
 
-            Alert.alert(
-                "Order Confirmed!",
-                `Thank you ${name}. Your order for ${quantity}kg of ${product.name} will be delivered to:\n${address}\n\nSold by: ${product.farmerName}\nTotal: ₹${total}\nPayment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : 'UPI'}`,
-                [
-                    { text: "OK", onPress: () => router.back() }
-                ]
-            );
+            // Navigate to Success Page
+            router.push({
+                pathname: '/order-success',
+                params: {
+                    orderId: `ORD-${Math.floor(10000 + Math.random() * 90000)}`,
+                    productName: product.name,
+                    quantity: quantity,
+                    total: finalTotal
+                }
+            });
         } catch (e) {
             console.error("Failed to save order", e);
             Alert.alert("Error", "Failed to place order. Please try again.");
@@ -164,13 +183,19 @@ export default function CheckoutScreen() {
                         </View>
                         <View style={styles.row}>
                             <Text style={[styles.label, { fontWeight: 'bold' }]}>{t.totalPrice}</Text>
-                            <Text style={[styles.value, { color: THEME_COLOR, fontSize: 20 }]}>₹{total}</Text>
+                            <Text style={[styles.value, { color: THEME_COLOR, fontSize: 20 }]}>₹{finalTotal}</Text>
                         </View>
                     </View>
 
                     {/* Shipping Details */}
                     <View style={styles.card}>
                         <Text style={styles.sectionTitle}>{t.shippingDetails}</Text>
+
+                        {/* Visual Map Placeholder */}
+                        <View style={{ height: 100, backgroundColor: '#E3F2FD', borderRadius: 10, marginBottom: 15, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#90CAF9', borderStyle: 'dashed' }}>
+                            <Ionicons name="map-outline" size={32} color="#2196F3" />
+                            <Text style={{ color: '#2196F3', fontSize: 12, marginTop: 5 }}>Location Pin: {address.split(',')[0] || 'Selected Address'}</Text>
+                        </View>
 
                         <Text style={styles.inputLabel}>{t.fullName}</Text>
                         <TextInput
@@ -209,10 +234,19 @@ export default function CheckoutScreen() {
                             <Ionicons name={paymentMethod === 'upi' ? "radio-button-on" : "radio-button-off"} size={24} color={THEME_COLOR} />
                             <Text style={styles.paymentText}>{t.upi}</Text>
                         </TouchableOpacity>
+
+                        {/* Escrow Trust Badge */}
+                        <View style={{ flexDirection: 'row', backgroundColor: '#FFF3E0', padding: 12, borderRadius: 8, marginTop: 15, alignItems: 'center' }}>
+                            <Ionicons name="shield-checkmark" size={24} color="#F57C00" />
+                            <View style={{ marginLeft: 10, flex: 1 }}>
+                                <Text style={{ fontWeight: 'bold', color: '#E65100', fontSize: 14 }}>Escrow Protection</Text>
+                                <Text style={{ color: '#EF6C00', fontSize: 12 }}>Your payment is held safely until you confirm delivery.</Text>
+                            </View>
+                        </View>
                     </View>
 
                     <TouchableOpacity style={styles.confirmButton} onPress={handleOrder}>
-                        <Text style={styles.confirmButtonText}>{t.placeOrder} - ₹{total}</Text>
+                        <Text style={styles.confirmButtonText}>{t.placeOrder} - ₹{finalTotal}</Text>
                     </TouchableOpacity>
 
                 </View>
