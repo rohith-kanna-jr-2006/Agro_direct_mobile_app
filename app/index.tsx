@@ -3,11 +3,16 @@ import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
 export default function Index() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasLanguage, setHasLanguage] = useState(false);
     const [hasUser, setHasUser] = useState(false);
     const router = useRouter();
+    const colorScheme = useColorScheme();
+    const theme = Colors[colorScheme ?? 'light'];
 
     useEffect(() => {
         checkStatus();
@@ -31,8 +36,8 @@ export default function Index() {
 
     if (isLoading) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#4CAF50" />
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+                <ActivityIndicator size="large" color={theme.primary} />
             </View>
         );
     }

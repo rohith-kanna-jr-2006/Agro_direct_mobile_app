@@ -63,7 +63,7 @@ export default function MyProductsScreen() {
         router.push({
             pathname: '/add-product',
             params: {
-                id: item.id,
+                id: item._id || item.id,
                 name: item.name,
                 price: item.price,
                 image: item.image,
@@ -87,7 +87,7 @@ export default function MyProductsScreen() {
                 <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FFA726' }]} onPress={() => handleEdit(item)}>
                     <Ionicons name="create-outline" size={20} color="white" />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#EF5350', marginTop: 10 }]} onPress={() => handleDelete(item.id)}>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#EF5350', marginTop: 10 }]} onPress={() => handleDelete(item._id || item.id)}>
                     <Ionicons name="trash-outline" size={20} color="white" />
                 </TouchableOpacity>
             </View>
@@ -105,7 +105,7 @@ export default function MyProductsScreen() {
 
             <FlatList
                 data={products}
-                keyExtractor={item => item.id}
+                keyExtractor={item => item._id || item.id}
                 renderItem={renderItem}
                 contentContainerStyle={styles.list}
             />

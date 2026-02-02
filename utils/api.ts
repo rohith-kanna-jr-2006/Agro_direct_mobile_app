@@ -3,7 +3,12 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 // Automatically detect the backend URL based on where the app is running
+// Automatically detect the backend URL based on where the app is running
 const getApiUrl = () => {
+    // MANUAL OVERRIDE: Use the specific LAN IP found via ipconfig (Wi-Fi Interface)
+    const MANUAL_IP = '10.178.132.211';
+    if (MANUAL_IP) return `http://${MANUAL_IP}:5000/api`;
+
     // If running in Expo Go or Build, this gives the IP of the machine running Metro
     const debuggerHost = Constants.expoConfig?.hostUri;
     const localhost = debuggerHost?.split(':')[0];
@@ -13,8 +18,7 @@ const getApiUrl = () => {
     }
 
     // Fallback: Use LAN IP for Physical Device (APK), 10.0.2.2 for Emulator
-    // Current LAN IP: 10.178.132.211
-    return Platform.OS === 'android' ? 'http://10.178.132.211:5000/api' : 'http://localhost:5000/api';
+    return Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 }
 
 const API_URL = getApiUrl();
@@ -154,6 +158,8 @@ export const sendOtp = async (phone: string) => {
         // Ensure +91 format
         const formattedNumber = phone.startsWith('+91') ? phone : `+91${phone}`;
 
+        console.log(`Sending OTP to ${formattedNumber} via ${API_URL}/send-otp`);
+
         const res = await fetch(`${API_URL}/send-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -187,6 +193,7 @@ export const verifyOtp = async (phone: string, code: string, role?: string) => {
     }
 };
 
+
 export const registerUserPhone = async (data: any) => {
     try {
         const res = await fetch(`${API_URL}/users/register-phone`, {
@@ -199,6 +206,65 @@ export const registerUserPhone = async (data: any) => {
         return result;
     } catch (error) {
         console.error("API Error registering user:", error);
+        throw error;
+    }
+};
+
+// --- Bank APIs ---
+
+export const verifyIfsc = async (ifsc: string) => {
+    try {
+        const res = await fetch(`${API_URL}/verify-ifsc`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ifsc })
+        });
+        const data = await res.json();
+        return data; // { success, details: { bank, branch } }
+    } catch (error) {
+        console.error("API Error verifying IFSC:", error);
+        throw error;
+    }
+};
+
+export const saveBankDetails = async (details: any) => {
+    try {
+        const res = await fetch(`${API_URL}/bank-details`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(details)
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "Failed to save bank details");
+        return data;
+    } catch (error) {
+        console.error("API Error saving bank details:", error);
+        throw error;
+    }
+};
+
+export const fetchBankDetails = async (userId: string, role: string) => {
+    try {
+        const res = await fetch(`${API_URL}/bank-details/${userId}/${role}`);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (error) {
+        console.error("API Error fetching bank details:", error);
+        return null;
+    }
+};
+
+export const verifyPmKisan = async (aadhaar: string) => {
+    try {
+        const res = await fetch(`${API_URL}/external/verify-pm-kisan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ aadhaar })
+        });
+        const data = await res.json();
+        return data; // Returns { success: true, valid: boolean, message: string }
+    } catch (error) {
+        console.error("API Error verifying Aadhaar:", error);
         throw error;
     }
 };

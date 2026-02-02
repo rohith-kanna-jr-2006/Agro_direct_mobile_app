@@ -1,0 +1,11 @@
+
+InterfaceAlias            
+--------------            
+Local Area Connection* 2  
+Local Area Connection* 1  
+Wi-Fi                     
+McAfee VPN                
+Loopback Pseudo-Interfa...
+
+
+
