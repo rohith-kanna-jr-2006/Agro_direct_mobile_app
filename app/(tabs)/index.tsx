@@ -441,7 +441,7 @@ export default function HomeScreen() {
     );
   }
 
-  // 4. Home Dashboard
+  // 4. Home Dashboard Helper Logic
   const allFeatures = [
     { id: 'Scan', title: t.plantHealth, icon: 'scan-outline', route: '/scanner', color: '#66BB6A', roles: ['farmer'] },
     { id: 'Sun', title: t.sunlight, icon: 'sunny-outline', route: '/sunlight', color: '#FFA726', roles: ['farmer'] },
@@ -451,6 +451,9 @@ export default function HomeScreen() {
     { id: 'Analytics', title: t.analytics, icon: 'bar-chart-outline', route: '/analytics', color: '#8D6E63', roles: ['farmer'] },
     { id: 'Profile', title: t.profile, icon: 'person-outline', route: '/profile', color: '#78909C', roles: ['farmer', 'buyer'] },
     { id: 'Market', title: t.marketplace, icon: 'cart-outline', route: '/marketplace', color: '#AB47BC', roles: ['buyer'] },
+    // { id: 'Orders', title: t.myOrders || "My Orders", icon: 'receipt-outline', route: '/orders', color: '#7E57C2', roles: ['buyer'] },
+    // Ensure "Orders" is visible for Farmer too if they get orders? Or "My Sales"? 
+    // For now keeping strict to existing logic but adding Orders for Farmer could be good later.
     { id: 'Orders', title: t.myOrders || "My Orders", icon: 'receipt-outline', route: '/orders', color: '#7E57C2', roles: ['buyer'] },
   ];
 
@@ -469,7 +472,6 @@ export default function HomeScreen() {
               text: "Login / Signup",
               onPress: () => {
                 setStep('auth');
-                // Optional: Reset role if needed, or keep current.
               }
             }
           ]
@@ -480,43 +482,94 @@ export default function HomeScreen() {
     router.push({ pathname: route as any, params: { lang: language, role: role } });
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t.appName}</Text>
-        <Text style={styles.headerSubtitle}>{role === 'farmer' ? t.farmer : t.buyer} - {profileName || userInfo?.name || t.welcome}</Text>
+  // 4. Home Dashboard
+  if (step === 'home') {
+    const isFarmer = role === 'farmer';
 
-        <TouchableOpacity onPress={switchAccount} style={{ position: 'absolute', top: 50, left: 20, zIndex: 10 }}>
-          <Ionicons name="swap-horizontal" size={24} color="white" />
-        </TouchableOpacity>
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
 
-        <TouchableOpacity onPress={logout} style={{ position: 'absolute', top: 50, right: 60, zIndex: 10 }}>
-          <Ionicons name="log-out-outline" size={24} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setStep('lang')} style={[styles.langSwitch, { zIndex: 10 }]}>
-          <Ionicons name="language" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.gridContainer}>
-          {features.map((item: any) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.gridItem, { backgroundColor: item.color, width: features.length === 1 ? '95%' : '48%' }]}
-              onPress={() => handleNavigation(item.route)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name={item.icon as any} size={40} color="white" />
-              <Text style={styles.gridLabel}>{item.title}</Text>
+        {/* Dashboard Header */}
+        <View style={[styles.header, { height: 'auto', paddingBottom: 30, borderRadius: 0, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <View>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Welcome Back,</Text>
+              <Text style={styles.headerTitle}>{profileName || userInfo?.name || "Farmer"}</Text>
+            </View>
+            <TouchableOpacity onPress={logout} style={{ padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 }}>
+              <Ionicons name="log-out-outline" size={24} color="white" />
             </TouchableOpacity>
-          ))}
+          </View>
+
+          {/* Quick Stats (Empty State for fresh login) */}
+          {isFarmer && (
+            <View style={{ flexDirection: 'row', marginTop: 25, justifyContent: 'space-between', width: '100%' }}>
+              <View style={styles.statCard}>
+                <Text style={styles.statLabel}>Total Sales</Text>
+                <Text style={styles.statValue}>₹0</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statLabel}>Active Crops</Text>
+                <Text style={styles.statValue}>0</Text>
+              </View>
+            </View>
+          )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+          {/* Conditional Content based on Role */}
+          {isFarmer ? (
+            <>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15 }}>Your Farm Tools</Text>
+              <View style={styles.gridContainer}>
+                {features.map((item: any) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.gridItem, { backgroundColor: item.color, width: '48%', height: 140 }]}
+                    onPress={() => handleNavigation(item.route)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name={item.icon as any} size={32} color="white" />
+                    <Text style={[styles.gridLabel, { fontSize: 14 }]}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          ) : (
+            <View style={styles.gridContainer}>
+              {features.map((item: any) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.gridItem, { backgroundColor: item.color, width: '48%' }]}
+                  onPress={() => handleNavigation(item.route)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name={item.icon as any} size={40} color="white" />
+                  <Text style={styles.gridLabel}>{item.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+
+        {/* FAB - Main Action: Add First Crop */}
+        {isFarmer && (
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={() => handleNavigation('/add-product')}
+          >
+            <Ionicons name="add" size={32} color="white" />
+            <Text style={styles.fabText}>Add Your First Crop</Text>
+          </TouchableOpacity>
+        )}
+
+      </SafeAreaView>
+    );
+  }
+
+  // Fallback (Should typically not reach here if step logic is sound)
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -554,5 +607,29 @@ const styles = StyleSheet.create({
   landingSubtitle: { fontSize: 18, color: '#666', marginBottom: 40, textAlign: 'center' },
   langButtonSmall: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 8, paddingHorizontal: 12, borderRadius: 20, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2 },
   langButtonSmallText: { marginLeft: 5, fontWeight: 'bold', color: THEME_COLOR },
-  guestText: { marginTop: 20, fontSize: 16, color: '#666', textDecorationLine: 'underline' }
+  guestText: { marginTop: 20, fontSize: 16, color: '#666', textDecorationLine: 'underline' },
+
+  // New Dashboard Stats
+  statCard: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 15, borderRadius: 15, width: '48%', alignItems: 'center' },
+  statLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginBottom: 5 },
+  statValue: { color: 'white', fontSize: 24, fontWeight: 'bold' },
+
+  // FAB
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    backgroundColor: THEME_COLOR,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5
+  },
+  fabText: { color: 'white', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }
 });

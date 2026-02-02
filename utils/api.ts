@@ -3,7 +3,12 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 // Automatically detect the backend URL based on where the app is running
+// Automatically detect the backend URL based on where the app is running
 const getApiUrl = () => {
+    // MANUAL OVERRIDE: Use the specific LAN IP found via ipconfig (Wi-Fi Interface)
+    const MANUAL_IP = '10.178.132.211';
+    if (MANUAL_IP) return `http://${MANUAL_IP}:5000/api`;
+
     // If running in Expo Go or Build, this gives the IP of the machine running Metro
     const debuggerHost = Constants.expoConfig?.hostUri;
     const localhost = debuggerHost?.split(':')[0];
@@ -13,8 +18,7 @@ const getApiUrl = () => {
     }
 
     // Fallback: Use LAN IP for Physical Device (APK), 10.0.2.2 for Emulator
-    // Current LAN IP: 10.178.132.211
-    return Platform.OS === 'android' ? 'http://10.178.132.211:5000/api' : 'http://localhost:5000/api';
+    return Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 }
 
 const API_URL = getApiUrl();
@@ -153,6 +157,8 @@ export const sendOtp = async (phone: string) => {
     try {
         // Ensure +91 format
         const formattedNumber = phone.startsWith('+91') ? phone : `+91${phone}`;
+
+        console.log(`Sending OTP to ${formattedNumber} via ${API_URL}/send-otp`);
 
         const res = await fetch(`${API_URL}/send-otp`, {
             method: 'POST',

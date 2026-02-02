@@ -71,16 +71,55 @@ app.post('/api/verify-otp', async (req, res) => {
     if (isValid) {
         // Check if user exists
         try {
-            const user = await User.findOne({ phone: phoneNumber });
-            if (user) {
-                // Fetch profile based on the requested role (default to farmer)
-                const searchRole = role ? role.toLowerCase() : 'farmer';
-                const profile = await Profile.findOne({ userId: user._id.toString(), role: searchRole });
+            // Robust Phone Search: Check exact, or with/without +91
+            const cleanPhone = phoneNumber.replace('+91', '');
+            const possiblePhones = [phoneNumber, cleanPhone, `+91${cleanPhone}`, `91${cleanPhone}`];
 
-                res.json({ success: true, message: "Login Successful!", user, profile });
+            let user = await User.findOne({ phone: { $in: possiblePhones } });
+
+            // Case-insensitive role search regex
+            const searchRole = role ? role.toLowerCase() : 'farmer';
+            const roleRegex = new RegExp(`^${searchRole}$`, 'i');
+
+            let profile = null;
+
+            if (user) {
+                // 1. Try to find profile by UserID (Standard Link)
+                profile = await Profile.findOne({
+                    userId: user._id.toString(),
+                    role: { $regex: roleRegex }
+                });
+            }
+
+            // 2. Fallback: If no profile found via UserID, try finding by PHONE in Profile directly
+            // (This handles cases where Profile is linked to Email/GoogleID but has the same phone number)
+            if (!profile) {
+                console.log("Profile not found by UserID, trying Phone...");
+                profile = await Profile.findOne({
+                    phone: { $in: possiblePhones },
+                    role: { $regex: roleRegex }
+                });
+
+                // If found by phone, we might want to ensure the User exists for this phone too?
+                // The 'user' variable above might be null if they never logged in via Phone flow but have a profile.
+                // In that case, we should probably return 'user' as null or create one?
+                // For login purposes, providing the profile allows access.
+                if (profile) {
+                    console.log("Found Profile by Phone linkage!");
+                    // If user was null (e.g. Google-only user logging in via OTP for first time), 
+                    // we might need to pretend we have a user or auto-create one later.
+                    // But for now, returning the profile satisfies the frontend check.
+                }
+            }
+
+            if (profile) {
+                res.json({ success: true, message: "Login Successful!", user: user || { _id: profile.userId }, profile }); // Mock user object if missing
+            } else if (user) {
+                res.json({ success: true, message: "OTP Verified", isNewUser: true, user });
             } else {
                 res.json({ success: true, message: "OTP Verified", isNewUser: true });
             }
+
         } catch (dbError) {
             console.error("Database Error during verify:", dbError);
             res.status(500).json({ success: false, error: dbError.message });
