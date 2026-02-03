@@ -1,10 +1,13 @@
 import { LogOut, Menu, Sprout } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import LanguageSelector from './LanguageSelector';
 
 const Header = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const handleLogout = () => {
         logout();
@@ -37,11 +40,13 @@ const Header = () => {
                     <span>FarmDirect</span>
                 </Link>
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                    <LanguageSelector />
+
                     <button
                         onClick={handleMarketplaceClick}
                         style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontWeight: 500, cursor: 'pointer', fontSize: '1rem', padding: '0.5rem' }}
                     >
-                        Marketplace
+                        {t('nav.marketplace')}
                     </button>
 
                     {!user ? (
@@ -50,14 +55,14 @@ const Header = () => {
                                 onClick={handleLoginClick}
                                 style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontWeight: 500, cursor: 'pointer', fontSize: '1rem', padding: '0.5rem' }}
                             >
-                                Login
+                                {t('nav.login')}
                             </button>
                             <button
                                 onClick={handleJoinClick}
                                 className="btn-primary"
                                 style={{ background: 'var(--secondary)', border: '1px solid var(--primary)', cursor: 'pointer' }}
                             >
-                                Join Now
+                                {t('hero.join_farmer')}
                             </button>
                         </>
                     ) : (
@@ -70,6 +75,7 @@ const Header = () => {
                             </Link>
                             <button
                                 onClick={handleLogout}
+                                title={t('nav.logout')}
                                 style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                             >
                                 <LogOut size={18} />

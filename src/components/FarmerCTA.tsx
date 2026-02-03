@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 const FarmerCTA = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const handleRegisterClick = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -22,22 +24,22 @@ const FarmerCTA = () => {
                     flexWrap: 'wrap'
                 } as any}>
                     <div style={{ flex: '1 1 450px' }}>
-                        <h2 style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>Are you a Farmer?</h2>
-                        <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '2.5rem' }}>Join 10,000+ farmers getting 30% higher margins by selling directly to consumers.</p>
+                        <h2 style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>{t('farmer_cta.title')}</h2>
+                        <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '2.5rem' }}>{t('farmer_cta.subtitle')}</p>
                         <button
                             onClick={handleRegisterClick}
                             className="btn-primary"
                             style={{ padding: '1.2rem 2.5rem', cursor: 'pointer', border: 'none' }}
                         >
-                            Register as Farmer
+                            {t('farmer_cta.register_btn')}
                         </button>
                     </div>
                     <div style={{ flex: '1 1 300px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                         {[
-                            { label: 'Earned', val: '₹25Cr+' },
-                            { label: 'Orders', val: '500k+' },
-                            { label: 'Buyers', val: '10k+' },
-                            { label: 'Delivery', val: '24h' }
+                            { label: t('farmer_cta.stats.earned'), val: '₹25Cr+' },
+                            { label: t('farmer_cta.stats.orders'), val: '500k+' },
+                            { label: t('farmer_cta.stats.buyers'), val: '10k+' },
+                            { label: t('farmer_cta.stats.delivery'), val: '24h' }
                         ].map((stat, i) => (
                             <div key={i} style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '15px' }}>
                                 <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--primary)' }}>{stat.val}</div>

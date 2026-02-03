@@ -1,8 +1,11 @@
 import { motion } from 'framer-motion';
 import { ArrowRight, Globe, ShieldCheck, Zap } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 const Hero = () => {
+    const { t } = useTranslation();
+
     return (
         <section style={{ paddingTop: '160px', paddingBottom: '100px', textAlign: 'center' }}>
             <div className="container">
@@ -22,7 +25,7 @@ const Hero = () => {
                         borderRadius: '100px',
                         border: '1px solid rgba(76, 175, 80, 0.2)'
                     }}>
-                        Next-Gen Agricultural Ecosystem
+                        {t('hero.badge')}
                     </span>
                     <h1 className="gradient-text" style={{
                         fontSize: 'clamp(3rem, 8vw, 5rem)',
@@ -30,7 +33,7 @@ const Hero = () => {
                         marginTop: '1.5rem',
                         lineHeight: 1.1
                     }}>
-                        Direct from Farm<br />to your Kitchen.
+                        {t('hero.title')}
                     </h1>
                     <p style={{
                         color: 'var(--text-muted)',
@@ -39,7 +42,7 @@ const Hero = () => {
                         margin: '2rem auto',
                         lineHeight: 1.8
                     }}>
-                        Connecting farmers with buyers directly using AI-powered quality grading and smart supply chains. No middlemen, just fresh produce.
+                        {t('hero.subtitle')}
                     </p>
                     <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '3rem' }}>
                         <Link
@@ -51,7 +54,7 @@ const Hero = () => {
                                 textDecoration: 'none'
                             }}
                         >
-                            Start Buying <ArrowRight size={20} />
+                            {t('hero.start_buying')} <ArrowRight size={20} />
                         </Link>
                         <Link
                             to="/signup?role=farmer"
@@ -69,7 +72,7 @@ const Hero = () => {
                                 gap: '0.5rem',
                                 textDecoration: 'none'
                             }}>
-                            Join as Farmer
+                            {t('hero.join_farmer')}
                         </Link>
                     </div>
                 </motion.div>
@@ -81,9 +84,9 @@ const Hero = () => {
                     marginTop: '8rem'
                 }}>
                     {[
-                        { icon: <ShieldCheck size={32} color="var(--primary)" />, title: 'AI Quality Check', desc: 'Every product is scanned and graded by our vision AI.' },
-                        { icon: <Zap size={32} color="var(--primary)" />, title: 'Instant Payments', desc: 'Secure blockchain transactions direct to farmer bank accounts.' },
-                        { icon: <Globe size={32} color="var(--primary)" />, title: 'Traceability', desc: 'Track your food from the exact farm it was harvested.' }
+                        { icon: <ShieldCheck size={32} color="var(--primary)" />, title: t('hero.feature1_title'), desc: t('hero.feature1_desc') },
+                        { icon: <Zap size={32} color="var(--primary)" />, title: t('hero.feature2_title'), desc: t('hero.feature2_desc') },
+                        { icon: <Globe size={32} color="var(--primary)" />, title: t('hero.feature3_title'), desc: t('hero.feature3_desc') }
                     ].map((feature, i) => (
                         <motion.div
                             key={i}

@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
     keywords: [{ type: String }], // identifying "keyword's" as an array of tags/interests
     name: { type: String },
     age: { type: Number },
+    role: { type: String, enum: ['farmer', 'buyer'], default: 'farmer' },
     createdAt: { type: Date, default: Date.now }
 });
 

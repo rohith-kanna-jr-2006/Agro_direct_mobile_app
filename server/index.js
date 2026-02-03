@@ -7,6 +7,9 @@ const Order = require('./models/Order');
 const Profile = require('./models/Profile');
 const User = require('./models/User');
 const BankDetails = require('./models/BankDetails');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'agrodirect_secret_2024';
 
 const app = express();
 const PORT = 5000;
@@ -183,44 +186,153 @@ app.post('/api/users/register-phone', async (req, res) => {
     }
 });
 
-// --- Users ---
+// --- Users Registration & Login ---
+
+// Scenario A: New User Registration (Sign Up)
 app.post('/api/users/register', async (req, res) => {
     try {
-        const { email, phone, username, password, location, keywords, name, age } = req.body;
+        const { name, email, password, phone, location, role } = req.body;
 
-        // Simple validation
-        if (!email || !password || !username) {
-            return res.status(400).json({ error: "Email, Username, and Password are required" });
+        // Backend Check: Query the database to find if email already exists
+        const userExists = await User.findOne({ email });
+
+        // Condition 1: If Email exists -> STOP
+        if (userExists) {
+            return res.status(409).json({
+                error: "Already registered email, please signup with another email id."
+            });
         }
 
-        const newUser = new User({ email, phone, username, password, location, keywords, name, age });
+        // Condition 2: If Email does NOT exist -> Create User
+        const newUser = new User({
+            name,
+            email,
+            password,
+            phone: phone || '0000000000', // Default if not provided
+            username: email, // Using email as username for consistency
+            location: location || '',
+            role: role || 'farmer',
+            createdAt: new Date()
+        });
+
         const savedUser = await newUser.save();
-        res.status(201).json(savedUser);
+
+        // Generate Token
+        const token = jwt.sign({ userId: savedUser._id, email: savedUser.email }, JWT_SECRET, { expiresIn: '7d' });
+
+        // Send to Dashboard (returning user and token)
+        res.status(201).json({
+            success: true,
+            message: "Registration successful!",
+            token,
+            user: {
+                id: savedUser._id,
+                name: savedUser.name,
+                email: savedUser.email,
+                role: role || 'farmer'
+            }
+        });
     } catch (err) {
-        if (err.code === 11000) {
-            res.status(400).json({ error: "User with this email, phone, or username already exists" });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
+        console.error("Registration Error:", err);
+        res.status(500).json({ error: err.message });
     }
 });
 
+// Scenario B: Existing User Login
 app.post('/api/users/login', async (req, res) => {
     try {
-        const { identifier, password } = req.body;
-        // Find by email OR phone OR username
-        const user = await User.findOne({
-            $or: [{ email: identifier }, { phone: identifier }, { username: identifier }]
-        });
+        const { email, password } = req.body;
 
-        if (!user) return res.status(404).json({ error: "User not found" });
+        // Backend Check: Verify email and password
+        const user = await User.findOne({ email });
 
-        if (user.password !== password) { // In production, use bcrypt!
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        // Verification (Plain text for now as per current DB state, but bcrypt is recommended)
+        if (user.password !== password) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
-        res.json(user);
+        // Condition: If Valid -> Generate Token
+        const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+        // Send to Dashboard
+        res.json({
+            success: true,
+            message: "Login successful!",
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email
+            }
+        });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Scenario C: Google Sign-In (Smart Handling)
+app.post('/api/users/google-login', async (req, res) => {
+    console.log("Google Login Request Received:", req.body.email);
+    try {
+        const { email, name, googleId, photo, role } = req.body;
+
+        if (!email) {
+            console.error("Google Login Error: Email missing");
+            return res.status(400).json({ error: "Email is required" });
+        }
+
+        // Backend Check: Check if email exists
+        let user = await User.findOne({ email });
+
+        if (user) {
+            console.log("Google Login: Existing user found:", email);
+            // If Exists: Log them in immediately
+            const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+            return res.json({
+                success: true,
+                message: "Google login successful!",
+                token,
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email
+                }
+            });
+        } else {
+            console.log("Google Login: Creating new user:", email);
+            // If New: Create account automatically
+            const newUser = new User({
+                name,
+                email,
+                username: email,
+                password: `google_${googleId}`, // Generate a safe placeholder
+                phone: '0000000000',
+                role: role || 'farmer',
+                createdAt: new Date()
+            });
+
+            const savedUser = await newUser.save();
+            console.log("Google Login: New user saved:", savedUser._id);
+            const token = jwt.sign({ userId: savedUser._id, email: savedUser.email }, JWT_SECRET, { expiresIn: '7d' });
+
+            // Redirect to Dashboard
+            res.status(201).json({
+                success: true,
+                message: "Google account created and logged in!",
+                token,
+                user: {
+                    id: savedUser._id,
+                    name: savedUser.name,
+                    email: savedUser.email
+                }
+            });
+        }
+    } catch (err) {
+        console.error("Google Login Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -330,6 +442,17 @@ app.post('/api/profile', async (req, res) => {
             req.body,
             { new: true, upsert: true }
         );
+
+        // Sync phone number to User model if provided
+        if (req.body.phone) {
+            try {
+                // Try finding by ID first
+                await User.findByIdAndUpdate(userId, { phone: req.body.phone });
+            } catch (e) {
+                // Fallback: If userId is email, find by email
+                await User.findOneAndUpdate({ email: userId }, { phone: req.body.phone });
+            }
+        }
         res.json(profile);
     } catch (err) {
         res.status(500).json({ error: err.message });

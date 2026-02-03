@@ -22,14 +22,20 @@ const Onboarding = () => {
 
     const [otpSent, setOtpSent] = useState(false);
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (step < 3) setStep(step + 1);
         else {
-            completeOnboarding(formData);
-            toast.success("Profile Setup Complete!");
-            navigate(role === 'farmer' ? '/farmer-dashboard' : '/buyer-dashboard');
+            try {
+                await completeOnboarding(formData);
+                toast.success("Profile Setup Complete!");
+                navigate(role === 'farmer' ? '/farmer-dashboard' : '/buyer-dashboard');
+            } catch (error) {
+                toast.error("Failed to save profile. Please try again.");
+                console.error(error);
+            }
         }
     };
+
 
     const sendOtp = () => {
         if (formData.phone.length === 10) {
