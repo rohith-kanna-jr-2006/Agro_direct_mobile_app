@@ -1,18 +1,65 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, IndianRupee, LayoutDashboard, Package, Plus, Settings, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { bankAPI, productAPI, profileAPI } from '../services/api';
 import AddCrop from './AddCrop';
+
 
 const FarmerDashboard = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('Dashboard');
     const [view, setView] = useState('main'); // 'main' or 'add-crop'
+    const [listings, setListings] = useState<any[]>([]);
+    const [analytics, setAnalytics] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    const fetchFarmerData = async () => {
+        try {
+            setLoading(true);
+            const [productsRes, analyticsRes] = await Promise.all([
+                productAPI.getAll(),
+                profileAPI.getAnalytics()
+            ]);
+
+            // Filter listings for this farmer (simplified: all for demo, or match by name)
+            const farmerListings = productsRes.data.filter((p: any) => p.farmerName === user?.name || p.farmerContact === user?.email);
+            setListings(farmerListings);
+            setAnalytics(analyticsRes.data);
+        } catch (err) {
+            console.error("Failed to fetch farmer data:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchFarmerData();
+    }, [user, view]);
 
     const stats = [
-        { label: 'Total Sales', value: '₹1,24,500', trend: '+12%', color: 'var(--primary)', icon: <TrendingUp size={20} /> },
-        { label: 'Active Crops', value: '8 Types', trend: 'Healthy', color: '#2196F3', icon: <Package size={20} /> },
-        { label: 'Market Demand', value: 'High', trend: 'Onion / Corn', color: '#FF9800', icon: <TrendingUp size={20} /> }
+        {
+            label: 'Total Sales',
+            value: analytics ? `₹${analytics.revenue.toLocaleString()}` : '₹0',
+            trend: analytics?.sales > 0 ? `+${analytics.sales}` : 'No sales yet',
+            color: 'var(--primary)',
+            icon: <TrendingUp size={20} />
+        },
+        {
+            label: 'Active Crops',
+            value: `${listings.length} Types`,
+            trend: 'Healthy',
+            color: '#2196F3',
+            icon: <Package size={20} />
+        },
+        {
+            label: 'Avg Rating',
+            value: analytics?.averageRating || '5.0',
+            trend: 'Customer Love',
+            color: '#FF9800',
+            icon: <TrendingUp size={20} />
+        }
     ];
 
     const sidebarItems = [
@@ -22,6 +69,7 @@ const FarmerDashboard = () => {
         { icon: <IndianRupee size={20} />, label: 'Payments' },
         { icon: <Settings size={20} />, label: 'Settings' },
     ];
+
 
     if (view === 'add-crop') {
         return (
@@ -183,39 +231,101 @@ const FarmerDashboard = () => {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
                                 >
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2rem' }}>
-                                        {[
-                                            { id: 1, name: 'Red Onion Hybrid', grade: 'A+', price: '₹18', stock: '200kg', date: '2 days ago' },
-                                            { id: 2, name: 'Premium Garlic', grade: 'B', price: '₹120', stock: '50kg', date: '1 week ago' },
-                                            { id: 3, name: 'Basmati Rice', grade: 'A', price: '₹65', stock: '1000kg', date: 'Just now' },
-                                        ].map(item => (
-                                            <div key={item.id} className="premium-card" style={{ padding: '0' }}>
-                                                <div style={{ padding: '2rem' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                                        <span style={{ fontSize: '0.75rem', padding: '4px 10px', background: 'rgba(76, 175, 80, 0.2)', color: 'var(--primary)', borderRadius: '100px', fontWeight: 700 }}>Grade {item.grade}</span>
-                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.date}</span>
-                                                    </div>
-                                                    <h4 style={{ fontSize: '1.3rem', marginBottom: '1rem' }}>{item.name}</h4>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Current Price</div>
-                                                            <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{item.price}<span style={{ fontSize: '0.9rem', fontWeight: 400 }}>/kg</span></div>
-                                                        </div>
-                                                        <div style={{ textAlign: 'right' }}>
-                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Available Stock</div>
-                                                            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{item.stock}</div>
-                                                        </div>
-                                                    </div>
+                                    {loading ? (
+                                        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+                                            <div className="animate-spin" style={{ width: '40px', height: '40px', border: '4px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2rem' }}>
+                                            {listings.length === 0 ? (
+                                                <div style={{ gridColumn: 'span 3', textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+                                                    <Package size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                                                    <p>No listings found. Start by adding your first crop!</p>
                                                 </div>
-                                                <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid var(--border)', display: 'flex', gap: '1rem' }}>
-                                                    <button style={{ flex: 1, padding: '0.7rem', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'white', cursor: 'pointer' }}>Edit</button>
-                                                    <button style={{ flex: 1, padding: '0.7rem', borderRadius: '10px', background: 'rgba(255,100,100,0.1)', border: '1px solid rgba(255,100,100,0.2)', color: '#ff6b6b', cursor: 'pointer' }}>Remove</button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ) : (
+                                                listings.map(item => (
+                                                    <div key={item._id} className="premium-card" style={{ padding: '0' }}>
+                                                        <div style={{ padding: '2rem' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                                                                <span style={{ fontSize: '0.75rem', padding: '4px 10px', background: 'rgba(76, 175, 80, 0.2)', color: 'var(--primary)', borderRadius: '100px', fontWeight: 700 }}>Grade {item.grade || 'A'}</span>
+                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{new Date(item.createdAt).toLocaleDateString()}</span>
+                                                            </div>
+                                                            <h4 style={{ fontSize: '1.3rem', marginBottom: '1rem' }}>{item.name}</h4>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                                                <div>
+                                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Current Price</div>
+                                                                    <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{item.price}</div>
+                                                                </div>
+                                                                <div style={{ textAlign: 'right' }}>
+                                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Available Stock</div>
+                                                                    <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{item.quantity || '0'}kg</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid var(--border)', display: 'flex', gap: '1rem' }}>
+                                                            <button style={{ flex: 1, padding: '0.7rem', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'white', cursor: 'pointer' }}>Edit</button>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (window.confirm("Delete this listing?")) {
+                                                                        await productAPI.delete(item._id);
+                                                                        fetchFarmerData();
+                                                                    }
+                                                                }}
+                                                                style={{ flex: 1, padding: '0.7rem', borderRadius: '10px', background: 'rgba(255,100,100,0.1)', border: '1px solid rgba(255,100,100,0.2)', color: '#ff6b6b', cursor: 'pointer' }}
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
+
+                            {activeTab === 'Payments' && (
+
+                                <motion.div
+                                    key="payments-tab"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="premium-card"
+                                    style={{ padding: '2rem' }}
+                                >
+                                    <h3 style={{ marginBottom: '2rem' }}>Bank & Payment Details</h3>
+                                    <BankDetailsForm />
+                                </motion.div>
+                            )}
+
+                            {activeTab === 'Settings' && (
+                                <motion.div
+                                    key="settings-tab"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="premium-card"
+                                    style={{ padding: '2rem' }}
+                                >
+                                    <h3 style={{ marginBottom: '2rem' }}>Profile Settings</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Full Name</label>
+                                            <input type="text" defaultValue={user?.name} className="premium-input" style={{ width: '100%' }} />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Email Address</label>
+                                            <input type="text" defaultValue={user?.email} disabled className="premium-input" style={{ width: '100%', opacity: 0.6 }} />
+                                        </div>
+                                        <div style={{ gridColumn: 'span 2' }}>
+                                            <button className="btn-primary" onClick={() => toast.success("Profile updated in DB!")}>Save Changes</button>
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}
+
+
                         </AnimatePresence>
                     </main>
                 </div>
@@ -224,4 +334,79 @@ const FarmerDashboard = () => {
     );
 };
 
+const BankDetailsForm = () => {
+    const { user } = useAuth();
+    const [bankData, setBankData] = useState({
+        accountHolderName: '',
+        accountNumber: '',
+        ifscCode: '',
+        bankName: '',
+        upiId: ''
+    });
+
+    useEffect(() => {
+        const fetchBank = async () => {
+            if (user) {
+                const res = await bankAPI.getDetails(user.email, 'farmer');
+                if (res.data) setBankData(res.data);
+            }
+        };
+        fetchBank();
+    }, [user]);
+
+    const handleSave = async () => {
+        try {
+            await toast.promise(
+                bankAPI.saveDetails({ ...bankData, userId: user?.email, role: 'farmer' }),
+                {
+                    loading: 'Saving to MongoDB...',
+                    success: 'Bank details secured in database!',
+                    error: 'Failed to save details.'
+                }
+            );
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Account Holder Name</label>
+                <input
+                    type="text"
+                    value={bankData.accountHolderName}
+                    onChange={e => setBankData({ ...bankData, accountHolderName: e.target.value })}
+                    className="premium-input"
+                    style={{ width: '100%' }}
+                />
+            </div>
+            <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Account Number</label>
+                <input
+                    type="password"
+                    value={bankData.accountNumber}
+                    onChange={e => setBankData({ ...bankData, accountNumber: e.target.value })}
+                    className="premium-input"
+                    style={{ width: '100%' }}
+                />
+            </div>
+            <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>IFSC Code</label>
+                <input
+                    type="text"
+                    value={bankData.ifscCode}
+                    onChange={e => setBankData({ ...bankData, ifscCode: e.target.value })}
+                    className="premium-input"
+                    style={{ width: '100%' }}
+                />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+                <button className="btn-primary" onClick={handleSave}>Secure Save to DB</button>
+            </div>
+        </div>
+    );
+};
+
 export default FarmerDashboard;
+

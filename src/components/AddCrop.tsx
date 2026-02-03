@@ -2,6 +2,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, LayoutDashboard, Scale, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
+import { productAPI } from '../services/api';
 
 interface AddCropProps {
     onBack: () => void;
@@ -9,7 +11,9 @@ interface AddCropProps {
 }
 
 const AddCrop = ({ onBack, onSuccess }: AddCropProps) => {
+    const { user } = useAuth();
     const [step, setStep] = useState(1);
+
     const [cropData, setCropData] = useState({
         type: '',
         variety: '',
@@ -33,17 +37,34 @@ const AddCrop = ({ onBack, onSuccess }: AddCropProps) => {
         }, 3000);
     };
 
-    const handleSubmit = () => {
-        toast.promise(
-            new Promise((resolve) => setTimeout(resolve, 2000)),
-            {
-                loading: 'Publishing listing...',
-                success: 'Crop listed successfully!',
-                error: 'Failed to list crop.',
-            }
-        );
-        setTimeout(onSuccess, 2100);
+    const handleSubmit = async () => {
+        try {
+            const productData = {
+                name: `${cropData.type} - ${cropData.variety || 'Standard'}`,
+                price: `₹28.5/kg`, // Using the simulated price
+                image: "https://images.unsplash.com/photo-1518977676601-b53f02bad67b?auto=format&fit=crop&q=80&w=800",
+                farmerName: user?.name || "Verified Farmer",
+                farmerContact: user?.email || "9999999999",
+                farmerAddress: user?.location || "Maduari, TN",
+                grade: cropData.quality,
+                quantity: cropData.quantity,
+                harvestDate: cropData.harvestDate
+            };
+
+            await toast.promise(
+                productAPI.create(productData),
+                {
+                    loading: 'Publishing listing to MongoDB...',
+                    success: 'Crop listed successfully in database!',
+                    error: 'Failed to save to MongoDB.',
+                }
+            );
+            setTimeout(onSuccess, 500);
+        } catch (error) {
+            console.error("Listing error:", error);
+        }
     };
+
 
     return (
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>

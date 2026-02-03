@@ -2,6 +2,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { RefreshCw } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -38,12 +39,13 @@ const RouteLogger = () => {
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole?: 'farmer' | 'buyer' }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
+  const { t } = useTranslation();
 
   if (isLoading) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--background)', color: 'white' }}>
       <div style={{ textAlign: 'center' }}>
         <RefreshCw className="animate-spin" size={32} style={{ marginBottom: '1rem', color: 'var(--primary)' }} />
-        <div>Verifying Session...</div>
+        <div>{t('common.loading')}</div>
       </div>
     </div>
   );
