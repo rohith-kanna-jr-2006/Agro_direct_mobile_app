@@ -1,18 +1,22 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowRight, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-// import { authAPI } from '../services/api'; // Not needed since no OTP
+import { authAPI } from '../services/api';
 
 const Onboarding = () => {
     const { user, role, completeOnboarding } = useAuth();
     const [step, setStep] = useState(1);
     const navigate = useNavigate();
+    const hasNavigated = useRef(false);
 
     const [formData, setFormData] = useState({
+        username: '',
         phone: '',
+        password: '',
+        confirmPassword: '',
         otp: '', // Kept for type stability, unused
         location: '',
         acres: '',
@@ -21,21 +25,96 @@ const Onboarding = () => {
         preferences: [] as string[]
     });
 
-    // Pre-fill phone from user object if available
+    const [usernameError, setUsernameError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
+
+    // Pre-fill from user object if available
     useEffect(() => {
-        if (user?.phone && user.phone !== '0000000000') {
-            setFormData(prev => ({ ...prev, phone: user.phone || '' }));
+        if (user) {
+            setFormData(prev => ({
+                ...prev,
+                phone: (user.phone && user.phone !== '0000000000') ? user.phone : prev.phone,
+                username: user.username || prev.username
+            }));
         }
     }, [user]);
 
+    // Redirect if already onboarded (only once)
+    useEffect(() => {
+        if (user?.isOnboarded && !hasNavigated.current) {
+            console.log('[Onboarding] User already onboarded, redirecting to dashboard');
+            hasNavigated.current = true;
+            navigate(role === 'farmer' ? '/farmer-dashboard' : '/buyer-dashboard', { replace: true });
+        }
+    }, [user?.isOnboarded, role, navigate]);
+
+    const validateUsername = (username: string) => {
+        if (username.length < 4) return "Minimum 4 characters required";
+        if (!/[a-z]/.test(username)) return "Must include a lowercase letter";
+        if (!/[A-Z]/.test(username)) return "Must include an uppercase letter";
+        if (!/[0-9]/.test(username)) return "Must include a number";
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(username)) return "Must include a special character";
+        return "";
+    };
+
+    const validatePassword = (pass: string) => {
+        if (!pass) return "Password is required";
+        if (pass.length < 8) return "Password must be at least 8 characters";
+        if (!/[a-z]/.test(pass)) return "Password must include a lowercase letter";
+        if (!/[A-Z]/.test(pass)) return "Password must include an uppercase letter";
+        if (!/[0-9]/.test(pass)) return "Password must include a number";
+        if (!/[@$!%*?&]/.test(pass)) return "Password must include a special character (@, $, !, %, *, ?, &)";
+        if (/\s/.test(pass)) return "Password cannot contain whitespace";
+        return "";
+    };
+
     const handleNext = async () => {
-        // Step 1: Phone Information (Common for all roles)
+        // Step 1: Username & Phone Information (Common for all roles)
         if (step === 1) {
+            const error = validateUsername(formData.username);
+            if (error) {
+                setUsernameError(error);
+                toast.error(error);
+                return;
+            }
+
+            try {
+                const checkRes = await authAPI.checkUsername(formData.username);
+                if (!checkRes.data.available && formData.username !== user?.username) {
+                    setUsernameError("Username is already taken");
+                    toast.error("Username is already taken");
+                    return;
+                }
+            } catch (err) {
+                console.error("Username check failed", err);
+            }
+
             if (formData.phone.length < 10) {
                 toast.error("Please enter a valid phone number");
                 return;
             }
-            // Proceed without OTP
+
+            const passError = validatePassword(formData.password);
+            if (passError) {
+                toast.error(passError);
+                return;
+            }
+
+            // Strict case-sensitive password match validation
+            if (formData.password !== formData.confirmPassword) {
+                toast.error("Passwords do not match. Please ensure both passwords are exactly the same (case-sensitive).");
+                return;
+            }
+
+            // Additional check: Ensure passwords are identical character by character
+            if (formData.password.length !== formData.confirmPassword.length) {
+                toast.error("Password length mismatch. Please re-enter your passwords.");
+                return;
+            }
+
+            setUsernameError('');
             setStep(step + 1);
             return;
         }
@@ -72,8 +151,98 @@ const Onboarding = () => {
             case 1:
                 return (
                     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                        <h3>Step 1: Contact Information</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Confirm your mobile number for secure transactions.</p>
+                        <h3>Step 1: Account Setup</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Set your unique username and confirm your contact details.</p>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Username</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. FarmerJohn_24"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.8rem',
+                                    borderRadius: '8px',
+                                    background: 'var(--background)',
+                                    border: `1px solid ${usernameError ? '#ff4444' : 'var(--border)'}`,
+                                    color: 'white'
+                                }}
+                                value={formData.username}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, username: e.target.value });
+                                    setUsernameError('');
+                                }}
+                            />
+                            {usernameError && <p style={{ color: '#ff4444', fontSize: '0.8rem', marginTop: '0.3rem' }}>{usernameError}</p>}
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+                                4+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char.
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Password</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="••••••••"
+                                        required
+                                        style={{ width: '100%', padding: '0.8rem', paddingRight: '2.5rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Confirm Password</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        placeholder="••••••••"
+                                        required
+                                        style={{ width: '100%', padding: '0.8rem', paddingRight: '2.5rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
+                                        value={formData.confirmPassword}
+                                        onChange={(e) => {
+                                            const newConfirmPassword = e.target.value;
+                                            setFormData({ ...formData, confirmPassword: newConfirmPassword });
+                                            // Real-time password match check (strict and case-sensitive)
+                                            if (formData.password && newConfirmPassword) {
+                                                setPasswordsMatch(formData.password === newConfirmPassword);
+                                            } else {
+                                                setPasswordsMatch(null);
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                                {formData.confirmPassword && (
+                                    <p style={{
+                                        color: passwordsMatch ? '#4CAF50' : '#ff4444',
+                                        fontSize: '0.75rem',
+                                        marginTop: '0.3rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}>
+                                        {passwordsMatch ? '✅ Passwords match' : '❌ Passwords do not match (case-sensitive)'}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
                         <div style={{ marginBottom: '1.5rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Phone Number</label>
                             <input
@@ -152,8 +321,94 @@ const Onboarding = () => {
             case 1:
                 return (
                     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                        <h3>Step 1: Identity & Contact</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Your Personal name or contact details.</p>
+                        <h3>Step 1: Account Setup</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Your unique username and contact details.</p>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Username</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. BuyerJane_99"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.8rem',
+                                    borderRadius: '8px',
+                                    background: 'var(--background)',
+                                    border: `1px solid ${usernameError ? '#ff4444' : 'var(--border)'}`,
+                                    color: 'white'
+                                }}
+                                value={formData.username}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, username: e.target.value });
+                                    setUsernameError('');
+                                }}
+                            />
+                            {usernameError && <p style={{ color: '#ff4444', fontSize: '0.8rem', marginTop: '0.3rem' }}>{usernameError}</p>}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Password</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="••••••••"
+                                        required
+                                        style={{ width: '100%', padding: '0.8rem', paddingRight: '2.5rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Confirm Password</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        placeholder="••••••••"
+                                        required
+                                        style={{ width: '100%', padding: '0.8rem', paddingRight: '2.5rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
+                                        value={formData.confirmPassword}
+                                        onChange={(e) => {
+                                            const newConfirmPassword = e.target.value;
+                                            setFormData({ ...formData, confirmPassword: newConfirmPassword });
+                                            // Real-time password match check (strict and case-sensitive)
+                                            if (formData.password && newConfirmPassword) {
+                                                setPasswordsMatch(formData.password === newConfirmPassword);
+                                            } else {
+                                                setPasswordsMatch(null);
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                                {formData.confirmPassword && (
+                                    <p style={{
+                                        color: passwordsMatch ? '#4CAF50' : '#ff4444',
+                                        fontSize: '0.75rem',
+                                        marginTop: '0.3rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}>
+                                        {passwordsMatch ? '✅ Passwords match' : '❌ Passwords do not match (case-sensitive)'}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
 
                         <div style={{ marginBottom: '1.5rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Phone Number</label>

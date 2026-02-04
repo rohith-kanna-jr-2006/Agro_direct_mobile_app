@@ -12,6 +12,9 @@ interface User {
     picture: string;
     role: UserRole;
     isOnboarded: boolean;
+    isProfileComplete: boolean;
+    isMfaVerified: boolean;
+    username?: string;
     userId?: string; // MongoDB _id
     location?: string;
     token?: string;
@@ -22,14 +25,15 @@ interface AuthContextType {
     user: User | null;
     role: UserRole;
     setRole: (role: UserRole) => void;
-    login: (googleData: any, flow?: 'login' | 'signup') => Promise<boolean>;
-    traditionalLogin: (credentials: any) => Promise<boolean>;
+    login: (googleData: any, flow?: 'login' | 'signup') => Promise<any>;
+    traditionalLogin: (credentials: any) => Promise<any>;
     register: (userData: any) => Promise<boolean>;
     logout: () => void;
     completeOnboarding: (details: any) => Promise<void>;
     isLoading: boolean;
     refreshUser: () => Promise<void>;
     verifyOtpLogin: (phoneNumber: string, code: string) => Promise<boolean>;
+    verifyMfa: (identifier: string, code: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,7 +52,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const syncAuth0 = async () => {
             if (!auth0Loading && isAuthenticated && auth0User) {
                 try {
+                    // Skip if user is already synced with same email and has a role
                     if (user && user.email === auth0User.email && user.role) {
+                        setIsLoading(false);
                         return;
                     }
 
@@ -60,13 +66,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                     let existingProfile = null;
                     try {
-                        // Check profile for BOTH roles if we aren't sure
                         const profileRes = await profileAPI.getProfile(auth0User.email!, detectedRole);
                         if (profileRes.data) {
                             existingProfile = profileRes.data;
-                            detectedRole = profileRes.data.role || detectedRole; // Don't lose existing role if profile.role is null
+                            detectedRole = profileRes.data.role || detectedRole;
                         } else {
-                            // Try the OTHER role just in case they switched
                             const otherRole = detectedRole === 'farmer' ? 'buyer' : 'farmer';
                             const otherRes = await profileAPI.getProfile(auth0User.email!, otherRole);
                             if (otherRes.data) {
@@ -82,8 +86,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         email: auth0User.email!,
                         name: auth0User.name!,
                         picture: auth0User.picture!,
-                        role: detectedRole || 'farmer', // Guaranteed not undefined
+                        role: detectedRole || 'farmer',
                         isOnboarded: !!existingProfile,
+                        isProfileComplete: !!existingProfile,
+                        isMfaVerified: false,
                         userId: auth0User.sub,
                         token: "auth0-token",
                         phone: auth0User.phone_number
@@ -92,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setUser(newUser);
                     setRole(newUser.role);
                     localStorage.setItem('user', JSON.stringify(newUser));
-                    localStorage.removeItem('intended_role'); // Clean up
+                    localStorage.removeItem('intended_role');
 
                     console.log("[Auth0] Identity Synced Successfully:", { role: newUser.role, onboarded: newUser.isOnboarded });
                 } catch (err) {
@@ -101,52 +107,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setIsLoading(false);
                 }
             } else if (!auth0Loading && !isAuthenticated) {
-                // Not logged in via Auth0, check local storage
-                const savedUser = localStorage.getItem('user');
-                if (savedUser) {
-                    const parsedUser = JSON.parse(savedUser);
-                    if (parsedUser && parsedUser.email) {
-                        setUser(parsedUser);
-                        setRole(parsedUser.role || 'farmer');
+                // Not logged in via Auth0, check local storage ONLY if user is not already set
+                if (!user) {
+                    const savedUser = localStorage.getItem('user');
+                    if (savedUser) {
+                        try {
+                            const parsedUser = JSON.parse(savedUser);
+                            if (parsedUser && parsedUser.email) {
+                                console.log("[AuthContext] Loading user from localStorage:", parsedUser.email, parsedUser.role);
+                                setUser(parsedUser);
+                                setRole(parsedUser.role || 'farmer');
+                            }
+                        } catch (err) {
+                            console.error("[AuthContext] Error parsing saved user:", err);
+                            localStorage.removeItem('user');
+                        }
                     }
                 }
+                setIsLoading(false);
+            } else if (!auth0Loading) {
                 setIsLoading(false);
             }
         };
         syncAuth0();
     }, [isAuthenticated, auth0User, auth0Loading]);
 
-    useEffect(() => {
-        const checkAuth = async () => {
-            const savedUser = localStorage.getItem('user');
-            if (savedUser) {
-                const parsedUser = JSON.parse(savedUser);
-                setUser(parsedUser);
-                setRole(parsedUser.role);
 
-                // Optional: Sync with backend on load
-                try {
-                    const response = await profileAPI.get(parsedUser.email, parsedUser.role);
-                    if (response.data) {
-                        const updatedUser = { ...parsedUser, ...response.data, isOnboarded: true };
-                        setUser(updatedUser);
-                        localStorage.setItem('user', JSON.stringify(updatedUser));
-                    }
-                } catch (err) {
-                    console.error("Failed to sync profile on load:", err);
-                }
-            }
-            setIsLoading(false);
-        };
-        checkAuth();
-    }, []);
 
     const refreshUser = async () => {
         if (user) {
             try {
-                const response = await profileAPI.get(user.email, user.role || 'farmer');
+                const response = await profileAPI.get(user.userId || user.email, user.role || 'farmer');
                 if (response.data) {
-                    const updatedUser = { ...user, ...response.data, isOnboarded: true };
+                    const profile = response.data;
+                    const backendUser = profile.user || {};
+                    const updatedUser = {
+                        ...user,
+                        ...backendUser,
+                        isOnboarded: true,
+                        phone: backendUser.mobileNumber || user.phone,
+                        location: backendUser.location || user.location
+                    };
                     setUser(updatedUser);
                     localStorage.setItem('user', JSON.stringify(updatedUser));
                 }
@@ -159,14 +160,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const login = async (googleData: any) => {
         setIsLoading(true);
         try {
+            // Ensure role is set - use the current role state or default to farmer
+            const userRole = role || 'farmer';
+            console.log(`[Login] Google login with role: ${userRole}`);
+
             // Scenario C: Google Sign-In
             const response = await authAPI.googleLogin({
                 email: googleData.email,
                 name: googleData.name,
                 googleId: googleData.sub || googleData.googleId, // handling both formats
                 photo: googleData.picture,
-                role: role
+                role: userRole
             });
+
+            if (response.data.requiresMFA) {
+                console.log("[GoogleLogin] MFA required for:", response.data.mfaIdentifier);
+                setIsLoading(false);
+                return { requiresMFA: true, mfaIdentifier: response.data.mfaIdentifier, role: userRole };
+            }
 
             const { token, user: backendUser } = response.data;
 
@@ -174,8 +185,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 email: backendUser.email,
                 name: backendUser.name,
                 picture: googleData.picture,
-                role: role || 'farmer',
-                isOnboarded: false, // Will check profile next
+                role: backendUser.role || userRole,
+                isOnboarded: backendUser.isOnboarded || false,
+                isProfileComplete: backendUser.isProfileComplete || false,
+                isMfaVerified: backendUser.isMfaVerified || false,
+                username: backendUser.username,
                 userId: backendUser.id,
                 token: token,
                 phone: backendUser.phone
@@ -183,19 +197,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Check if profile exists to set isOnboarded
             try {
-                const profileRes = await profileAPI.get(backendUser.id, role || 'farmer');
+                const profileRes = await profileAPI.get(backendUser.id, newUser.role || 'farmer');
                 if (profileRes.data) {
                     newUser.isOnboarded = true;
-                    newUser.role = profileRes.data.role;
+                    if (profileRes.data.role) newUser.role = profileRes.data.role;
+                } else {
+                    console.log(`[Google Auth] No profile for role: ${newUser.role}.`);
+                    newUser.isOnboarded = false;
                 }
             } catch (pErr) {
                 console.log("No profile found for Google user yet");
+                newUser.isOnboarded = false;
             }
 
             setUser(newUser);
+            setRole(newUser.role || 'farmer');
             localStorage.setItem('user', JSON.stringify(newUser));
-            if (newUser.role) setRole(newUser.role);
 
+            console.log(`[Login] User logged in successfully with role: ${newUser.role}`);
             setIsLoading(false);
             return true;
         } catch (err) {
@@ -209,36 +228,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const traditionalLogin = async (credentials: any) => {
         setIsLoading(true);
         try {
+            // Ensure role is set - use the explicit role from passed credentials if available, else context state
+            const targetRole = credentials.role || role || 'farmer';
+            console.log(`[TraditionalLogin] Logging in with role attempt: ${targetRole}`);
+
             // Scenario B: Existing User Login
-            const response = await authAPI.login(credentials);
+            const response = await authAPI.login({
+                email: credentials.email,
+                password: credentials.password,
+                role: targetRole
+            });
+
+            if (response.data.requiresMFA) {
+                console.log("[TraditionalLogin] MFA required for:", response.data.mfaIdentifier);
+                setIsLoading(false);
+                return { requiresMFA: true, mfaIdentifier: response.data.mfaIdentifier, role: targetRole };
+            }
+
             const { token, user: backendUser } = response.data;
 
             const newUser: User = {
                 email: backendUser.email,
                 name: backendUser.name,
                 picture: '',
-                role: role || 'farmer',
-                isOnboarded: false,
+                role: backendUser.role || targetRole,
+                isOnboarded: backendUser.isOnboarded || false,
+                isProfileComplete: backendUser.isProfileComplete || false,
+                isMfaVerified: backendUser.isMfaVerified || false,
+                username: backendUser.username,
                 userId: backendUser.id,
                 token: token,
                 phone: backendUser.phone
             };
 
-            // Check profile
+            // Double check profile for the SPECIFIC role we just established
             try {
-                const profileRes = await profileAPI.get(backendUser.id, role || 'farmer');
+                // newUser.role is guaranteed at this point but TS needs a string
+                const profileRes = await profileAPI.get(backendUser.id, newUser.role as string);
                 if (profileRes.data) {
                     newUser.isOnboarded = true;
-                    newUser.role = profileRes.data.role;
+                    // If profile has a role, use it as source of truth
+                    if (profileRes.data.role) newUser.role = profileRes.data.role;
+                } else {
+                    // IMPORTANT: If they logged in with a role but have no profile for it, 
+                    // they are NOT onboarded as that role yet.
+                    console.log(`[Auth] No profile found for role: ${newUser.role}. Flagging as not onboarded.`);
+                    newUser.isOnboarded = false;
                 }
             } catch (pErr) {
-                console.log("No profile found for user yet");
+                console.log("No profile found for role:", newUser.role);
+                newUser.isOnboarded = false; // Fallback to onboarding
             }
 
             setUser(newUser);
+            setRole(newUser.role);
             localStorage.setItem('user', JSON.stringify(newUser));
-            if (newUser.role) setRole(newUser.role);
 
+            console.log(`[TraditionalLogin] User logged in as: ${newUser.role}`);
             toast.success("Login Successful!");
             setIsLoading(false);
             return true;
@@ -254,24 +300,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const register = async (userData: any) => {
         setIsLoading(true);
         try {
+            // Ensure role is set
+            const userRole = role || 'farmer';
+            console.log(`[Register] Creating account with role: ${userRole}`);
+
             // Scenario A: New User Registration
-            const response = await authAPI.register({ ...userData, role });
+            const response = await authAPI.register({ ...userData, role: userRole });
             const { token, user: backendUser } = response.data;
 
             const newUser: User = {
                 email: backendUser.email,
                 name: backendUser.name,
                 picture: '',
-                role: role || 'farmer',
-                isOnboarded: false,
+                role: backendUser.role || userRole,
+                isOnboarded: backendUser.isOnboarded || false,
+                isProfileComplete: backendUser.isProfileComplete || false,
+                isMfaVerified: backendUser.isMfaVerified || false,
+                username: backendUser.username,
                 userId: backendUser.id,
                 token: token,
                 phone: backendUser.phone
             };
 
             setUser(newUser);
+            setRole(newUser.role || 'farmer');
             localStorage.setItem('user', JSON.stringify(newUser));
 
+            console.log(`[Register] Account created successfully with role: ${newUser.role}`);
             toast.success("Account created successfully!");
             setIsLoading(false);
             return true;
@@ -300,7 +355,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 name: backendUser?.name || 'User',
                 picture: profile?.photo || '',
                 role: role || 'farmer',
-                isOnboarded: !!profile, // If profile exists, they are onboarded
+                isOnboarded: backendUser?.isOnboarded || !!profile,
+                isProfileComplete: backendUser?.isProfileComplete || !!profile,
+                isMfaVerified: backendUser?.isMfaVerified || true,
+                username: backendUser?.username,
                 userId: backendUser?._id || backendUser?.id || profile?.userId,
                 token: token,
                 phone: phoneNumber
@@ -327,6 +385,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const verifyMfa = async (identifier: string, code: string) => {
+        setIsLoading(true);
+        try {
+            console.log(`[AuthContext] Verifying MFA for: ${identifier}`);
+            const response = await authAPI.verifyMfa({ identifier, code });
+            const { token, user: backendUser } = response.data;
+
+            const newUser: User = {
+                email: backendUser.email,
+                name: backendUser.name,
+                picture: '',
+                role: backendUser.role,
+                isOnboarded: backendUser.isOnboarded || false,
+                isProfileComplete: backendUser.isProfileComplete || false,
+                isMfaVerified: backendUser.isMfaVerified || false,
+                username: backendUser.username,
+                userId: backendUser.id,
+                token: token,
+                phone: backendUser.phone
+            };
+
+            // Check profile
+            try {
+                const profileRes = await profileAPI.get(backendUser.id, newUser.role as string);
+                if (profileRes.data) {
+                    newUser.isOnboarded = true;
+                    if (profileRes.data.role) newUser.role = profileRes.data.role;
+                }
+            } catch (pErr) {
+                console.log("No profile found for MFA user yet");
+            }
+
+            setUser(newUser);
+            setRole(newUser.role);
+            localStorage.setItem('user', JSON.stringify(newUser));
+
+            toast.success("MFA Verified! Login Successful.");
+            setIsLoading(false);
+            return true;
+        } catch (err: any) {
+            console.error("MFA Verification failed:", err);
+            toast.error(err.response?.data?.error || "Invalid MFA code");
+            setIsLoading(false);
+            return false;
+        }
+    };
+
 
     const logout = () => {
         setUser(null);
@@ -344,22 +449,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.log("[Onboarding] Submitting Profile Data:", { userId: backendUserId, role: backendRole });
 
                 // Save to MongoDB
-                const profileData = {
+                const profileData: any = {
                     userId: backendUserId,
                     role: backendRole,
                     email: user.email,
                     name: user.name,
                     phone: details.phone,
                     location: details.location,
+                    username: details.username,
+                    password: details.password, // Will be hashed on backend
                     bio: details.bio || (backendRole === 'farmer' ? `Farms ${details.acres} acres of ${details.crops?.join(', ')}` : ''),
-                    photo: user.picture,
-                    buyerDetails: backendRole === 'buyer' ? {
-                        subRole: details.businessName ? 'business' : 'consumer',
-                        businessName: details.businessName,
-                        interests: details.preferences,
-                        weeklyRequirement: details.weeklyRequirement
-                    } : undefined
+                    photo: user.picture
                 };
+
+                if (backendRole === 'farmer') {
+                    profileData.landSize = details.acres;
+                    profileData.cropsGrown = details.crops;
+                } else if (backendRole === 'buyer') {
+                    profileData.shopName = details.businessName;
+                    profileData.preferences = details.preferences;
+                    profileData.type = details.businessName ? 'retailer' : 'household';
+                }
 
                 await profileAPI.update(profileData);
 
@@ -368,7 +478,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     ...user,
                     ...details,
                     role: backendRole, // Keep the role that was just saved
-                    isOnboarded: true
+                    isOnboarded: true,
+                    isProfileComplete: true,
+                    username: details.username || user.username
                 };
 
                 setUser(finalizedUser);
@@ -383,7 +495,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, role, setRole, login, traditionalLogin, register, logout, completeOnboarding, isLoading, refreshUser, verifyOtpLogin }}>
+        <AuthContext.Provider value={{ user, role, setRole, login, traditionalLogin, register, logout, completeOnboarding, isLoading, refreshUser, verifyOtpLogin, verifyMfa }}>
             {children}
         </AuthContext.Provider>
     );

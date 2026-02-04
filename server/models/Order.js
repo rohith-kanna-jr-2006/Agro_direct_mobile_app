@@ -14,6 +14,18 @@ const orderSchema = new mongoose.Schema({
     userId: String,
     userName: String,
     userAddress: String,
+    status: { type: String, default: 'Pending' },
+    currentLocation: {
+        lat: Number,
+        lng: Number
+    },
+    trackingHistory: [
+        {
+            lat: Number,
+            lng: Number,
+            timestamp: { type: Date, default: Date.now }
+        }
+    ],
     createdAt: { type: Date, default: Date.now }
 });
 

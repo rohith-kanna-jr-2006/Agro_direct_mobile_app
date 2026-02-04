@@ -48,8 +48,11 @@ const Profile = () => {
             {user.picture && <img src={user.picture} alt={user.name} style={{ width: '50px', height: '50px', borderRadius: '50%' }} />}
             <div>
                 <h2 style={{ fontSize: '1.2rem', margin: 0 }}>{user.name}</h2>
-                <p style={{ margin: 0, color: 'var(--text-muted)' }}>{user.email}</p>
-                {user.email_verified && <span style={{ color: '#4CAF50', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>Verified via Auth0</span>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {user.username && <p style={{ margin: 0, color: 'var(--primary)', fontSize: '0.9rem', fontWeight: 600 }}>@{user.username}</p>}
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{user.email}</p>
+                </div>
+                {user.email_verified && <span style={{ color: '#4CAF50', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>Verified via Auth0</span>}
             </div>
         </div>
     );

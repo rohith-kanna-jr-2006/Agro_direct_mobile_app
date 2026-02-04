@@ -1,4 +1,4 @@
-import { Filter, Leaf, Mail, MapPin, Mic, Phone, Search as SearchIcon, ShoppingCart, User, X } from 'lucide-react';
+import { Eye, EyeOff, Filter, Leaf, Mail, MapPin, Mic, Minus, Phone, Plus, Search as SearchIcon, ShieldCheck, ShoppingBag, ShoppingCart, User, X } from 'lucide-react';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
@@ -6,7 +6,73 @@ import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { orderAPI, productAPI, profileAPI } from '../services/api';
+import LiveTracking from './LiveTracking';
 import Profile from './Profile';
+
+const ProductCard = ({ item, onAddToCart, t }: { item: any; onAddToCart: (qty: number) => void; t: any }) => {
+    const [qty, setQty] = useState(1);
+
+    const increment = () => setQty(prev => prev + 1);
+    const decrement = () => setQty(prev => (prev > 1 ? prev - 1 : 1));
+
+    return (
+        <div className="premium-card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
+            <div className="product-image-container" style={{ position: 'relative', overflow: 'hidden' }}>
+                <img src={item.img || item.image} alt={item.name} style={{ width: '100%', height: '200px', objectFit: 'cover', transition: 'transform 0.3s ease' }} />
+                <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--primary)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem' }}>
+                    {item.grade || 'A'}
+                </div>
+                <div className="quick-view-overlay" style={{
+                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s',
+                    cursor: 'pointer'
+                }}>
+                    <button style={{ padding: '0.5rem 1rem', background: 'white', border: 'none', borderRadius: '20px', fontWeight: 600 }}>Quick View</button>
+                </div>
+                <style>{`.product-image-container:hover .quick-view-overlay { opacity: 1; }`}</style>
+            </div>
+
+            <div style={{ padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>{item.name || (item.key ? t(`marketplace.products.${item.key}`) : 'Product')}</h3>
+                    <span style={{ color: 'var(--primary)', fontWeight: 800 }}>{item.price}</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <Leaf size={12} /> {item.farm || item.farmerName}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '2px' }}>
+                        <MapPin size={12} /> {item.dist || 'Local'}
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', background: 'rgba(0,0,0,0.05)', borderRadius: '12px', padding: '0.5rem' }}>
+                    <button
+                        onClick={decrement}
+                        style={{ background: 'white', border: 'none', borderRadius: '8px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
+                    >
+                        <Minus size={16} />
+                    </button>
+                    <span style={{ flex: 1, textAlign: 'center', fontWeight: 700, fontSize: '1.1rem' }}>{qty}</span>
+                    <button
+                        onClick={increment}
+                        style={{ background: 'white', border: 'none', borderRadius: '8px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
+                    >
+                        <Plus size={16} />
+                    </button>
+                </div>
+
+                <button
+                    onClick={() => onAddToCart(qty)}
+                    className="btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', fontSize: '0.9rem', padding: '0.8rem' }}
+                >
+                    {t('Add to Cart')}
+                </button>
+            </div>
+        </div>
+    );
+};
 
 const BuyerDashboard = () => {
     const { user } = useAuth();
@@ -22,6 +88,9 @@ const BuyerDashboard = () => {
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [priceRange, setPriceRange] = useState(500);
     const [showNearest, setShowNearest] = useState(false);
+    const [orders, setOrders] = useState<any[]>([]);
+    const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<any>(null);
+    const [showTrackingModal, setShowTrackingModal] = useState(false);
 
     const categoryKeys = ['vegetables', 'fruits', 'grains', 'pulses', 'oil_seeds', 'spices'];
 
@@ -48,23 +117,45 @@ const BuyerDashboard = () => {
         }
     };
 
+    const fetchOrders = async () => {
+        try {
+            const response = await orderAPI.getAll();
+            // Filter orders for this user
+            const userOrders = response.data.filter((o: any) => o.userId === user?.email);
+            setOrders(userOrders);
+        } catch (err) {
+            console.error("Failed to fetch orders:", err);
+        }
+    };
+
     useEffect(() => {
         fetchProducts();
-    }, []);
+        fetchOrders();
+    }, [user]);
 
-    const handleAddToCart = (product: any) => {
-        setCartItems([...cartItems, product]);
-        toast.success(`Added ${product.name || product.key} to cart!`);
+    const handleAddToCart = (product: any, qty: number) => {
+        const existingItemIndex = cartItems.findIndex(item => (item._id || item.key) === (product._id || product.key));
+
+        if (existingItemIndex > -1) {
+            const newCart = [...cartItems];
+            newCart[existingItemIndex].qty += qty;
+            setCartItems(newCart);
+        } else {
+            setCartItems([...cartItems, { ...product, qty }]);
+        }
+
+        toast.success(`Added ${qty} ${product.name || product.key} to cart!`);
         setShowCart(true);
     };
 
     const handlePurchase = async () => {
         // Simplified checkout for demo
         const orderPromises = cartItems.map(item => {
+            const unitPrice = parseInt((item.price || '0').replace(/[^0-9]/g, ''));
             const orderData = {
                 productName: item.name || item.key,
-                totalPrice: parseInt((item.price || '0').replace(/[^0-9]/g, '')),
-                quantity: 1,
+                totalPrice: unitPrice * (item.qty || 1),
+                quantity: item.qty || 1,
                 farmer: {
                     name: item.farm || item.farmerName || "Verified Farmer",
                     address: item.dist ? `${item.dist} away` : "Local",
@@ -78,7 +169,7 @@ const BuyerDashboard = () => {
         });
 
         try {
-            await toast.promise(
+            const results = await toast.promise(
                 Promise.all(orderPromises),
                 {
                     loading: 'Processing checkout...',
@@ -86,8 +177,17 @@ const BuyerDashboard = () => {
                     error: 'Checkout failed.',
                 }
             );
+
+            // For demo: Automatically show tracking for the first order if successful
+            if (results.length > 0) {
+                const newOrder = results[0].data;
+                setSelectedOrderForTracking(newOrder);
+                setShowTrackingModal(true);
+            }
+
             setCartItems([]);
             setShowCart(false);
+            fetchOrders();
         } catch (error) {
             console.error("Purchase error:", error);
         }
@@ -242,7 +342,29 @@ const BuyerDashboard = () => {
                         <motion.button
                             whileHover={{ scale: 1.05, y: -2 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={() => setView(view === 'marketplace' ? 'profile' : 'marketplace')}
+                            onClick={() => setView('orders')}
+                            style={{
+                                width: '54px',
+                                height: '54px',
+                                background: view === 'orders' ? 'var(--primary)' : 'var(--surface)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '18px',
+                                color: view === 'orders' ? 'white' : 'var(--text-muted)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.3s ease',
+                                boxShadow: view === 'orders' ? '0 8px 20px var(--primary-glow)' : '0 8px 20px rgba(0,0,0,0.2)'
+                            }}
+                        >
+                            <ShoppingBag size={22} />
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.05, y: -2 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setView(view === 'profile' ? 'marketplace' : 'profile')}
                             style={{
                                 width: '54px',
                                 height: '54px',
@@ -338,49 +460,69 @@ const BuyerDashboard = () => {
                             ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
                                     {filteredProducts.map((item, i) => (
-                                        <div key={i} className="premium-card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
-                                            <div className="product-image-container" style={{ position: 'relative', overflow: 'hidden' }}>
-                                                <img src={item.img || item.image} alt={item.name} style={{ width: '100%', height: '200px', objectFit: 'cover', transition: 'transform 0.3s ease' }} />
-                                                <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--primary)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem' }}>
-                                                    {item.grade || 'A'}
-                                                </div>
-                                                <div className="quick-view-overlay" style={{
-                                                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex',
-                                                    alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s',
-                                                    cursor: 'pointer'
-                                                }}>
-                                                    <button style={{ padding: '0.5rem 1rem', background: 'white', border: 'none', borderRadius: '20px', fontWeight: 600 }}>Quick View</button>
-                                                </div>
-                                                <style>{`.product-image-container:hover .quick-view-overlay { opacity: 1; }`}</style>
-                                            </div>
-
-                                            <div style={{ padding: '1rem' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>{item.name || (item.key ? t(`marketplace.products.${item.key}`) : 'Product')}</h3>
-                                                    <span style={{ color: 'var(--primary)', fontWeight: 800 }}>{item.price}</span>
-                                                </div>
-                                                <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '1rem' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                                        <Leaf size={12} /> {item.farm || item.farmerName}
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '2px' }}>
-                                                        <MapPin size={12} /> {item.dist || 'Local'}
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => handleAddToCart(item)}
-                                                    className="btn-primary"
-                                                    style={{ width: '100%', justifyContent: 'center', fontSize: '0.9rem', padding: '0.6rem' }}
-                                                >
-                                                    {t('Add to Cart')}
-                                                </button>
-                                            </div>
-                                        </div>
+                                        <ProductCard
+                                            key={item._id || item.key || i}
+                                            item={item}
+                                            onAddToCart={(qty) => handleAddToCart(item, qty)}
+                                            t={t}
+                                        />
                                     ))}
                                 </div>
                             )}
                         </div>
                     </>
+                ) : view === 'orders' ? (
+                    <div style={{ flex: 1 }}>
+                        <h2 style={{ fontSize: '1.8rem', marginBottom: '2rem', fontWeight: 800 }}>My Orders</h2>
+                        {orders.length === 0 ? (
+                            <div className="premium-card" style={{ padding: '4rem', textAlign: 'center' }}>
+                                <ShoppingBag size={48} style={{ color: 'var(--text-muted)', marginBottom: '1rem', opacity: 0.5 }} />
+                                <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>No orders yet. Start shopping!</p>
+                                <button onClick={() => setView('marketplace')} className="btn-primary" style={{ marginTop: '1.5rem', marginInline: 'auto' }}>Go to Marketplace</button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gap: '1.5rem' }}>
+                                {orders.map((order, idx) => (
+                                    <motion.div
+                                        key={order._id || idx}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: idx * 0.1 }}
+                                        className="premium-card"
+                                        style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                                    >
+                                        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                                            <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'var(--primary-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                                                <ShoppingBag size={28} />
+                                            </div>
+                                            <div>
+                                                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{order.productName}</h3>
+                                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Ordered on {new Date(order.date).toLocaleDateString()}</p>
+                                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                                    <span style={{ fontSize: '0.85rem', padding: '2px 10px', borderRadius: '20px', background: 'rgba(76, 175, 80, 0.1)', color: 'var(--primary)', fontWeight: 600 }}>
+                                                        {order.status || 'Processing'}
+                                                    </span>
+                                                    <span style={{ fontWeight: 800, color: 'var(--text)' }}>₹{order.totalPrice}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '1rem' }}>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedOrderForTracking(order);
+                                                    setShowTrackingModal(true);
+                                                }}
+                                                className="btn-primary"
+                                                style={{ fontSize: '0.9rem', padding: '0.7rem 1.2rem' }}
+                                            >
+                                                Track Live
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 ) : (
                     <div className="premium-card" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
                         <h2 style={{ marginBottom: '2rem' }}>My Profile</h2>
@@ -410,11 +552,18 @@ const BuyerDashboard = () => {
 
                             <div style={{ flex: 1, overflowY: 'auto' }}>
                                 {cartItems.map((item, i) => (
-                                    <div key={i} style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
+                                    <div key={i} style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
                                         <img src={item.img || item.image || "https://placeholder.com/50x50"} alt="" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
-                                        <div>
-                                            <h4>{item.name || item.key}</h4>
-                                            <div style={{ color: 'var(--primary)', fontWeight: 600 }}>{item.price}</div>
+                                        <div style={{ flex: 1 }}>
+                                            <h4 style={{ fontWeight: 700 }}>{item.name || item.key}</h4>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                                <div style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                                    {item.price} <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}>x {item.qty || 1}</span>
+                                                </div>
+                                                <div style={{ fontWeight: 800 }}>
+                                                    ₹{parseInt((item.price || '0').replace(/[^0-9]/g, '')) * (item.qty || 1)}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -423,9 +572,82 @@ const BuyerDashboard = () => {
                             <div style={{ marginTop: '2rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontWeight: 700, fontSize: '1.2rem' }}>
                                     <span>Total</span>
-                                    <span>₹{cartItems.reduce((acc, item) => acc + parseInt((item.price || '0').replace(/[^0-9]/g, '')), 0)}</span>
+                                    <span>₹{cartItems.reduce((acc, item) => acc + (parseInt((item.price || '0').replace(/[^0-9]/g, '')) * (item.qty || 1)), 0)}</span>
                                 </div>
                                 <button className="btn-primary" onClick={handlePurchase} style={{ width: '100%', padding: '1rem', justifyContent: 'center' }}>Checkout Now</button>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* Tracking Modal */}
+            <AnimatePresence>
+                {showTrackingModal && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            onClick={() => setShowTrackingModal(false)}
+                            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', zIndex: 1000 }}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            style={{
+                                position: 'fixed',
+                                top: '8%',
+                                left: '8%',
+                                right: '8%',
+                                bottom: '8%',
+                                background: 'var(--background)',
+                                zIndex: 1001,
+                                borderRadius: '32px',
+                                padding: '2.5rem',
+                                boxShadow: '0 25px 70px -12px rgba(0, 0, 0, 0.8)',
+                                border: '1px solid var(--border)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden'
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                                    <div style={{ width: '60px', height: '60px', borderRadius: '18px', background: 'var(--primary-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <ShoppingBag size={32} color="var(--primary)" />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'white', letterSpacing: '-0.02em', margin: 0 }}>Live Tracking</h2>
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: '4px 0 0 0' }}>Order #{selectedOrderForTracking?._id || '...'}</p>
+                                    </div>
+                                </div>
+                                <motion.button
+                                    whileHover={{ scale: 1.1, rotate: 90, background: 'rgba(255,255,255,0.1)' }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => setShowTrackingModal(false)}
+                                    style={{
+                                        background: 'rgba(255,255,255,0.05)',
+                                        border: '1px solid var(--border)',
+                                        width: '56px',
+                                        height: '56px',
+                                        borderRadius: '16px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        color: 'white',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    <X size={28} />
+                                </motion.button>
+                            </div>
+
+                            <div style={{ flex: 1, minHeight: 0, borderRadius: '24px', overflow: 'hidden' }}>
+                                <LiveTracking
+                                    orderId={selectedOrderForTracking?._id || 'test_order'}
+                                    initialPosition={{ lat: 12.9716, lng: 77.5946 }}
+                                />
                             </div>
                         </motion.div>
                     </>
@@ -440,15 +662,22 @@ const BuyerDashboard = () => {
 const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
     const [formData, setFormData] = useState({
         name: user?.name || '',
+        username: user?.username || '',
         email: user?.email || '',
         phone: user?.phone || '',
         location: user?.location || '',
+        password: '',
+        confirmPassword: '',
         // Buyer fields
         type: 'household',
         shopName: '',
         gstNumber: '',
-        preferences: ''
+        preferences: '',
+        isMfaVerified: user?.isMfaVerified || false
     });
+
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -459,10 +688,15 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
                         const d = res.data;
                         setFormData(prev => ({
                             ...prev,
+                            name: d.user?.name || prev.name,
+                            username: d.user?.username || prev.username,
+                            phone: d.user?.mobileNumber || prev.phone,
+                            location: d.user?.location || prev.location,
                             type: d.type || 'household',
                             shopName: d.businessData?.shopName || '',
                             gstNumber: d.businessData?.gstNumber || '',
-                            preferences: d.preferences?.join(', ') || ''
+                            preferences: d.preferences?.join(', ') || '',
+                            isMfaVerified: d.user?.isMfaVerified || false
                         }));
                     }
                 } catch (e) { console.error(e); }
@@ -471,18 +705,62 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
         fetchProfile();
     }, [user, role]);
 
+    const validateUsername = (username: string) => {
+        if (username.length < 4) return "Minimum 4 characters required";
+        if (!/[a-z]/.test(username)) return "Must include a lowercase letter";
+        if (!/[A-Z]/.test(username)) return "Must include an uppercase letter";
+        if (!/[0-9]/.test(username)) return "Must include a number";
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(username)) return "Must include a special character";
+        return "";
+    };
+
+    const validatePassword = (pass: string) => {
+        if (!pass) return ""; // Password change is optional
+        if (pass.length < 8) return "Password must be at least 8 characters";
+        if (!/[a-z]/.test(pass)) return "Password must include a lowercase letter";
+        if (!/[A-Z]/.test(pass)) return "Password must include an uppercase letter";
+        if (!/[0-9]/.test(pass)) return "Password must include a number";
+        if (!/[@$!%*?&]/.test(pass)) return "Password must include a special character (@, $, !, %, *, ?, &)";
+        if (/\s/.test(pass)) return "Password cannot contain whitespace";
+        return "";
+    };
+
     const handleSave = async () => {
+        const usernameError = validateUsername(formData.username);
+        if (usernameError) {
+            toast.error(usernameError);
+            return;
+        }
+
+        if (formData.password) {
+            const passError = validatePassword(formData.password);
+            if (passError) {
+                toast.error(passError);
+                return;
+            }
+            if (formData.password !== formData.confirmPassword) {
+                toast.error("Passwords do not match");
+                return;
+            }
+        }
+
         try {
             const payload: any = {
-                userId: user.id || user._id || user.email,
+                userId: user.userId || user.id || user._id || user.email,
                 role,
                 name: formData.name,
+                username: formData.username,
                 phone: formData.phone,
                 email: formData.email,
                 location: formData.location,
+                isMfaVerified: formData.isMfaVerified,
                 type: formData.type,
                 preferences: formData.preferences.split(',').map(s => s.trim()).filter(s => s)
             };
+
+            if (formData.password) {
+                payload.password = formData.password;
+            }
 
             if (formData.type === 'retailer') {
                 payload.businessData = {
@@ -522,6 +800,15 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
             </div>
 
             <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Username</label>
+                <div style={{ position: 'relative' }}>
+                    <User size={18} className="input-icon" style={{ color: 'var(--primary)' }} />
+                    <input type="text" value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} className="premium-input with-icon" placeholder="Unique username" />
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>4+ chars, A-Z, a-z, 0-9, special char</p>
+            </div>
+
+            <div className="input-group">
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Email Address</label>
                 <div style={{ position: 'relative' }}>
                     <Mail size={18} className="input-icon" />
@@ -542,6 +829,73 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
                 <div style={{ position: 'relative' }}>
                     <MapPin size={18} className="input-icon" />
                     <input type="text" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="premium-input with-icon" />
+                </div>
+            </div>
+
+            <div style={{ gridColumn: 'span 2', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                <h4 style={{ marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <ShieldCheck size={18} /> Account Security
+                </h4>
+            </div>
+
+            <div className="input-group" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(76, 175, 80, 0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(76, 175, 80, 0.1)' }}>
+                <div>
+                    <h5 style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Two-Factor Authentication</h5>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Secure your account with an additional verification layer.</p>
+                </div>
+                <div
+                    onClick={() => setFormData({ ...formData, isMfaVerified: !formData.isMfaVerified })}
+                    style={{
+                        width: '50px',
+                        height: '26px',
+                        background: formData.isMfaVerified ? 'var(--primary)' : 'var(--text-muted)',
+                        borderRadius: '13px',
+                        position: 'relative',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                    }}
+                >
+                    <div style={{
+                        width: '20px',
+                        height: '20px',
+                        background: 'white',
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: '3px',
+                        left: formData.isMfaVerified ? '27px' : '3px',
+                        transition: 'all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+                    }} />
+                </div>
+            </div>
+
+            <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>New Password</label>
+                <div style={{ position: 'relative' }}>
+                    <ShieldCheck size={18} className="input-icon" />
+                    <input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="premium-input with-icon" placeholder="Leave blank to keep current" style={{ paddingRight: '2.5rem' }} />
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                    >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Min 8 chars, A-Z, a-z, 0-9, @$!%*?&</p>
+            </div>
+
+            <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Confirm Password</label>
+                <div style={{ position: 'relative' }}>
+                    <ShieldCheck size={18} className="input-icon" />
+                    <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} className="premium-input with-icon" style={{ paddingRight: '2.5rem' }} />
+                    <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                    >
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                 </div>
             </div>
 
