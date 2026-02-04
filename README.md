@@ -1,3 +1,7 @@
+# KisnaSmartApp (AgroDirect)
+
+**For installation and running instructions, please see [INSTALLATION.md](./INSTALLATION.md).**
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, IndianRupee, LayoutDashboard, Package, Plus, Settings, TrendingUp } from 'lucide-react';
+import { Bell, IndianRupee, LayoutDashboard, Mail, MapPin, Package, Phone, Plus, Printer, Settings, ShieldCheck, Sprout, TrendingUp, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { bankAPI, productAPI, profileAPI } from '../services/api';
 import AddCrop from './AddCrop';
+import Profile from './Profile';
 
 
 const FarmerDashboard = () => {
@@ -40,24 +41,31 @@ const FarmerDashboard = () => {
 
     const stats = [
         {
-            label: 'Total Sales',
-            value: analytics ? `₹${analytics.revenue.toLocaleString()}` : '₹0',
-            trend: analytics?.sales > 0 ? `+${analytics.sales}` : 'No sales yet',
+            label: 'Total Revenue',
+            value: '₹12,400',
+            sub: '+12% from last week',
             color: 'var(--primary)',
-            icon: <TrendingUp size={20} />
+            icon: <IndianRupee size={20} />
         },
         {
-            label: 'Active Crops',
-            value: `${listings.length} Types`,
-            trend: 'Healthy',
+            label: 'Active Listings',
+            value: `${listings.length} Crops`,
+            sub: 'In Stock',
             color: '#2196F3',
             icon: <Package size={20} />
         },
         {
-            label: 'Avg Rating',
-            value: analytics?.averageRating || '5.0',
-            trend: 'Customer Love',
+            label: 'Pending Orders',
+            value: '12',
+            sub: 'Action Required',
             color: '#FF9800',
+            icon: <Bell size={20} />
+        },
+        {
+            label: 'Avg. Rating',
+            value: analytics?.averageRating || '4.8',
+            sub: 'Excellent',
+            color: '#9C27B0',
             icon: <TrendingUp size={20} />
         }
     ];
@@ -67,7 +75,7 @@ const FarmerDashboard = () => {
         { icon: <Package size={20} />, label: 'My Listings' },
         { icon: <TrendingUp size={20} />, label: 'Sales Analytics' },
         { icon: <IndianRupee size={20} />, label: 'Payments' },
-        { icon: <Settings size={20} />, label: 'Settings' },
+        { icon: <Settings size={20} />, label: 'Profile' },
     ];
 
 
@@ -133,7 +141,7 @@ const FarmerDashboard = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
                             <div>
                                 <h1 style={{ fontSize: '2.2rem', fontWeight: 800 }}>{activeTab}</h1>
-                                <p style={{ color: 'var(--text-muted)' }}>Welcome back, {user?.name.split(' ')[0]}! Here's what's happening today.</p>
+                                <p style={{ color: 'var(--text-muted)' }}>Welcome back, {user?.name?.split(' ')[0] || 'Farmer'}! Here's your farm overview.</p>
                             </div>
                             <div style={{ display: 'flex', gap: '1rem' }}>
                                 <div style={{ position: 'relative' }}>
@@ -159,68 +167,94 @@ const FarmerDashboard = () => {
                                     exit={{ opacity: 0, y: -10 }}
                                 >
                                     {/* Stats Grid */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
                                         {stats.map((stat, i) => (
-                                            <div key={i} className="premium-card" style={{ padding: '1.8rem' }}>
+                                            <div key={i} className="premium-card" style={{ padding: '1.5rem' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                                    <div style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>{stat.icon}</div>
-                                                    <span style={{ fontSize: '0.8rem', color: stat.color }}>{stat.trend}</span>
+                                                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{stat.label}</span>
+                                                    <div style={{ color: stat.color }}>{stat.icon}</div>
                                                 </div>
-                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>{stat.label}</span>
-                                                <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '0.5rem' }}>{stat.value}</div>
+                                                <div style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.5rem' }}>{stat.value}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{stat.sub}</div>
                                             </div>
                                         ))}
                                     </div>
 
-                                    {/* Quick Actions Row */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
-                                        {/* Crop Tracker */}
-                                        <div className="premium-card" style={{ padding: '2rem' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                                                <h3 style={{ fontSize: '1.3rem' }}>Ongoing Shipments</h3>
-                                                <button style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}>Track All</button>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+                                        {/* Recent Orders & Graph */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                                            {/* Sales Graph Placeholder */}
+                                            <div className="premium-card" style={{ padding: '2rem', height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, var(--surface), #0a0c10)' }}>
+                                                <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                                                    <TrendingUp size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                                                    <p>Sales Graph (Last 7 Days)</p>
+                                                    <p style={{ fontSize: '0.8rem' }}>Chart visualization placeholder</p>
+                                                </div>
                                             </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                                                {[
-                                                    { name: 'Red Onion (Prime)', status: 'In Transit', weight: '850kg', destination: 'Mumbai Hub', eta: '4h left' },
-                                                    { name: 'Gold Corn', status: 'Verification', weight: '1200kg', destination: 'Warehouse A', eta: 'In Review' },
-                                                ].map((item, i) => (
-                                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.2rem', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                                                        <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                                                            {item.name.includes('Onion') ? '🧅' : '🌽'}
-                                                        </div>
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: 600, fontSize: '1.05rem' }}>{item.name}</div>
-                                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>To {item.destination} • {item.weight}</div>
-                                                        </div>
-                                                        <div style={{ textAlign: 'right' }}>
-                                                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: item.status === 'In Transit' ? '#2196F3' : 'var(--accent)' }}>{item.status}</div>
-                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.eta}</div>
-                                                        </div>
-                                                    </div>
-                                                ))}
+
+                                            {/* Recent Orders Table */}
+                                            <div className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
+                                                <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+                                                    <h3 style={{ fontSize: '1.1rem' }}>Recent Orders</h3>
+                                                </div>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                    <thead style={{ background: 'rgba(255,255,255,0.02)' }}>
+                                                        <tr>
+                                                            <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Order ID</th>
+                                                            <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Buyer</th>
+                                                            <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Items</th>
+                                                            <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Status</th>
+                                                            <th style={{ padding: '1rem', textAlign: 'right', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {[
+                                                            { id: '#101', buyer: 'Ramesh Kumar', items: '50kg Onion', status: 'Pending' },
+                                                            { id: '#102', buyer: 'Fresh Mart', items: '200kg Potato', status: 'Shipped' },
+                                                            { id: '#103', buyer: 'Anita S.', items: '10kg Tomato', status: 'Delivered' },
+                                                        ].map((order, i) => (
+                                                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                                <td style={{ padding: '1rem', fontWeight: 600 }}>{order.id}</td>
+                                                                <td style={{ padding: '1rem' }}>{order.buyer}</td>
+                                                                <td style={{ padding: '1rem' }}>{order.items}</td>
+                                                                <td style={{ padding: '1rem' }}>
+                                                                    <span style={{
+                                                                        padding: '4px 10px',
+                                                                        borderRadius: '100px',
+                                                                        fontSize: '0.8rem',
+                                                                        background: order.status === 'Pending' ? 'rgba(255, 152, 0, 0.1)' : order.status === 'Shipped' ? 'rgba(33, 150, 243, 0.1)' : 'rgba(76, 175, 80, 0.1)',
+                                                                        color: order.status === 'Pending' ? '#FF9800' : order.status === 'Shipped' ? '#2196F3' : '#4CAF50'
+                                                                    }}>
+                                                                        {order.status}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                                                    <button style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                                                        <Printer size={14} /> Print Label
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         </div>
 
-                                        {/* Market Insight */}
-                                        <div className="premium-card" style={{ padding: '2rem', background: 'linear-gradient(180deg, var(--surface), #0a0c10)' }}>
-                                            <h3 style={{ fontSize: '1.3rem', marginBottom: '1.5rem' }}>Market Trends</h3>
-                                            <div style={{ padding: '1.5rem', borderRadius: '16px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid var(--primary)', marginBottom: '1.5rem' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--primary)', fontWeight: 600, marginBottom: '0.5rem' }}>
-                                                    <TrendingUp size={18} /> High Demand Alert
-                                                </div>
-                                                <p style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>Potato price expected to rise by 20% in the next week. We suggest holding stock.</p>
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                                {['Soybean', 'Wheat', 'Tomato'].map((crop) => (
-                                                    <div key={crop} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.8rem', borderBottom: '1px solid var(--border)' }}>
-                                                        <span style={{ color: 'var(--text-muted)' }}>{crop}</span>
-                                                        <span style={{ fontWeight: 600, color: '#4CAF50' }}>+4.2%</span>
+                                        {/* Right Column: Market/Insights */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                                            <div className="premium-card" style={{ padding: '2rem' }}>
+                                                <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem' }}>Top Crops</h3>
+                                                {['Onion', 'Potato', 'Tomato'].map((crop, i) => (
+                                                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
+                                                        <span style={{ fontWeight: 600 }}>{crop}</span>
+                                                        <span style={{ color: '#4CAF50' }}>₹{(Math.random() * 50 + 20).toFixed(0)}/kg</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
                                     </div>
+
+
                                 </motion.div>
                             )}
 
@@ -299,9 +333,9 @@ const FarmerDashboard = () => {
                                 </motion.div>
                             )}
 
-                            {activeTab === 'Settings' && (
+                            {activeTab === 'Profile' && (
                                 <motion.div
-                                    key="settings-tab"
+                                    key="profile-tab"
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
@@ -309,19 +343,8 @@ const FarmerDashboard = () => {
                                     style={{ padding: '2rem' }}
                                 >
                                     <h3 style={{ marginBottom: '2rem' }}>Profile Settings</h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Full Name</label>
-                                            <input type="text" defaultValue={user?.name} className="premium-input" style={{ width: '100%' }} />
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Email Address</label>
-                                            <input type="text" defaultValue={user?.email} disabled className="premium-input" style={{ width: '100%', opacity: 0.6 }} />
-                                        </div>
-                                        <div style={{ gridColumn: 'span 2' }}>
-                                            <button className="btn-primary" onClick={() => toast.success("Profile updated in DB!")}>Save Changes</button>
-                                        </div>
-                                    </div>
+                                    <Profile />
+                                    <ProfileForm user={user} role="farmer" />
                                 </motion.div>
                             )}
 
@@ -329,6 +352,195 @@ const FarmerDashboard = () => {
                         </AnimatePresence>
                     </main>
                 </div>
+            </div>
+        </div>
+    );
+};
+
+const ProfileForm = ({ user, role }: { user: any, role: string }) => {
+    const [formData, setFormData] = useState({
+        name: user?.name || '',
+        email: user?.email || '',
+        phone: user?.phone || '',
+        location: user?.location || '',
+        landSize: '',
+        cropsGrown: '',
+        aadhaarLast4: '',
+        // Buyer fields
+        type: 'household',
+        shopName: '',
+        preferences: ''
+    });
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            if (user) {
+                try {
+                    const res = await profileAPI.getProfile(user.id || user.email || user._id, role); // Ensure we pass an ID if possible
+                    if (res.data) {
+                        const d = res.data;
+                        setFormData(prev => ({
+                            ...prev,
+                            landSize: d.landSize?.toString() || '',
+                            cropsGrown: d.cropsGrown?.join(', ') || '',
+                            aadhaarLast4: d.kyc?.aadhaarLast4 || '',
+                            // Buyer specific
+                            type: d.type || 'household',
+                            shopName: d.businessData?.shopName || '',
+                            preferences: d.preferences?.join(', ') || ''
+                        }));
+                    }
+                } catch (e) { console.error(e); }
+            }
+        };
+        fetchProfile();
+    }, [user, role]);
+
+    const handleSave = async () => {
+        try {
+            const payload: any = {
+                userId: user.id || user._id || user.email,
+                role,
+                name: formData.name,
+                phone: formData.phone,
+                email: formData.email, // Read only but sending back
+            };
+
+            if (role === 'farmer') {
+                payload.landSize = Number(formData.landSize);
+                payload.cropsGrown = formData.cropsGrown.split(',').map(s => s.trim()).filter(s => s);
+                payload.aadhaarLast4 = formData.aadhaarLast4;
+                // Coordinates placeholder - logic to convert location string to coords would go here or in backend
+                payload.coordinates = [78.1198, 9.9252]; // Hardcoded Madurai for now
+            } else if (role === 'buyer') {
+                payload.type = formData.type;
+                if (formData.type === 'retailer') payload.shopName = formData.shopName;
+                payload.preferences = formData.preferences.split(',').map(s => s.trim()).filter(s => s);
+            }
+
+            await toast.promise(
+                profileAPI.updateProfile(payload),
+                {
+                    loading: 'Saving Profile...',
+                    success: 'Profile updated successfully!',
+                    error: 'Failed to update profile.'
+                }
+            );
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            {/* Personal Details */}
+            <div style={{ gridColumn: 'span 2' }}>
+                <h4 style={{ marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <User size={18} /> Personal Information
+                </h4>
+            </div>
+
+            <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Full Name</label>
+                <div style={{ position: 'relative' }}>
+                    <User size={18} className="input-icon" />
+                    <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="premium-input with-icon" />
+                </div>
+            </div>
+
+            <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Email Address</label>
+                <div style={{ position: 'relative' }}>
+                    <Mail size={18} className="input-icon" />
+                    <input type="text" value={formData.email} disabled className="premium-input with-icon" style={{ opacity: 0.7 }} />
+                </div>
+            </div>
+
+            <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Phone Number</label>
+                <div style={{ position: 'relative' }}>
+                    <Phone size={18} className="input-icon" />
+                    <input type="text" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="premium-input with-icon" />
+                </div>
+            </div>
+
+            <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Location</label>
+                <div style={{ position: 'relative' }}>
+                    <MapPin size={18} className="input-icon" />
+                    <input type="text" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="premium-input with-icon" />
+                </div>
+            </div>
+
+            {role === 'farmer' && (
+                <>
+                    <div style={{ gridColumn: 'span 2', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                        <h4 style={{ marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Sprout size={18} /> Farm Details
+                        </h4>
+                    </div>
+
+                    <div className="input-group">
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Land Size (Acres)</label>
+                        <div style={{ position: 'relative' }}>
+                            <MapPin size={18} className="input-icon" />
+                            <input type="number" value={formData.landSize} onChange={e => setFormData({ ...formData, landSize: e.target.value })} className="premium-input with-icon" placeholder="e.g. 5.2" />
+                        </div>
+                    </div>
+
+                    <div className="input-group">
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Aadhaar (Last 4)</label>
+                        <div style={{ position: 'relative' }}>
+                            <ShieldCheck size={18} className="input-icon" />
+                            <input type="text" maxLength={4} value={formData.aadhaarLast4} onChange={e => setFormData({ ...formData, aadhaarLast4: e.target.value })} className="premium-input with-icon" placeholder="XXXX" />
+                        </div>
+                    </div>
+
+                    <div className="input-group" style={{ gridColumn: 'span 2' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Crops Grown (comma separated)</label>
+                        <div style={{ position: 'relative' }}>
+                            <Sprout size={18} className="input-icon" />
+                            <input type="text" value={formData.cropsGrown} onChange={e => setFormData({ ...formData, cropsGrown: e.target.value })} className="premium-input with-icon" placeholder="e.g. Tomato, Potato, Onion" />
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {role === 'buyer' && (
+                <>
+                    <div style={{ gridColumn: 'span 2', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                        <h4 style={{ marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <LayoutDashboard size={18} /> Buyer Profile
+                        </h4>
+                    </div>
+
+                    <div className="input-group">
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Buyer Type</label>
+                        <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} className="premium-input" style={{ width: '100%' }}>
+                            <option value="household">Household Consumer</option>
+                            <option value="retailer">Retailer / Business</option>
+                        </select>
+                    </div>
+
+                    {formData.type === 'retailer' && (
+                        <>
+                            <div className="input-group">
+                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Shop Name</label>
+                                <input type="text" value={formData.shopName} onChange={e => setFormData({ ...formData, shopName: e.target.value })} className="premium-input" />
+                            </div>
+                        </>
+                    )}
+                    <div className="input-group" style={{ gridColumn: 'span 2' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Buying Preferences (comma separated)</label>
+                        <input type="text" value={formData.preferences} onChange={e => setFormData({ ...formData, preferences: e.target.value })} className="premium-input" placeholder="e.g. Tomato, Rice, Spices" />
+                    </div>
+                </>
+            )}
+
+            <div style={{ gridColumn: 'span 2', marginTop: '1rem' }}>
+                <button className="btn-primary" onClick={handleSave} style={{ width: '100%', justifyContent: 'center', padding: '1rem' }}>
+                    Save Profile Changes
+                </button>
             </div>
         </div>
     );
@@ -409,4 +621,3 @@ const BankDetailsForm = () => {
 };
 
 export default FarmerDashboard;
-

@@ -1,3 +1,4 @@
+import { useAuth0 } from '@auth0/auth0-react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { RefreshCw } from 'lucide-react';
 import React, { useEffect } from 'react';
@@ -38,10 +39,11 @@ const RouteLogger = () => {
 // --- Protected Route Logic ---
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole?: 'farmer' | 'buyer' }) => {
   const { user, isLoading } = useAuth();
+  const { isLoading: auth0Loading } = useAuth0();
   const location = useLocation();
   const { t } = useTranslation();
 
-  if (isLoading) return (
+  if (isLoading || (!user && auth0Loading)) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--background)', color: 'white' }}>
       <div style={{ textAlign: 'center' }}>
         <RefreshCw className="animate-spin" size={32} style={{ marginBottom: '1rem', color: 'var(--primary)' }} />
@@ -61,8 +63,9 @@ const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode,
   }
 
   if (requiredRole && user.role !== requiredRole) {
-    console.error(`[AUTH] Role mismatch for ${location.pathname}. Needed ${requiredRole}, got ${user.role}`);
-    return <Navigate to={user.role === 'farmer' ? '/farmer-dashboard' : '/buyer-dashboard'} replace />;
+    console.error(`[AUTH] Role mismatch for ${location.pathname}. Needed ${requiredRole}, got ${user.role || 'NONE'}`);
+    const target = (user.role === 'farmer') ? '/farmer-dashboard' : (user.role === 'buyer' ? '/buyer-dashboard' : '/onboarding');
+    return <Navigate to={target} replace />;
   }
 
   return <>{children}</>;
@@ -78,7 +81,15 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => (
 );
 
 const LandingPage = () => {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+
+  if (user) {
+    if (!user.isOnboarded) return <Navigate to="/onboarding" />;
+    if (user.role === 'farmer') return <Navigate to="/farmer-dashboard" />;
+    if (user.role === 'buyer') return <Navigate to="/buyer-dashboard" />;
+    // Fallback if role is missing but onboarded (shouldn't happen with sync fixes)
+    return <Navigate to="/onboarding" />;
+  }
 
   const handleReset = () => {
     localStorage.clear();
@@ -114,8 +125,11 @@ const FallbackRedirect = () => {
 };
 
 const App = () => {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  console.log(`[GoogleAuth] Using Client ID: ${googleClientId ? googleClientId.substring(0, 15) + '...' : 'UNDEFINED'}`);
+
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+    <GoogleOAuthProvider clientId={googleClientId}>
       <AuthProvider>
         <ScrollToTop />
         <RouteLogger />

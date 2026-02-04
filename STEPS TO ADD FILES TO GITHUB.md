@@ -43,3 +43,21 @@ If there are merge conflicts, you will need to resolve them in your editor, then
 
 ### "Authentication failed"
 Ensure you are logged in. You may need to generate a Personal Access Token (PAT) if password authentication is disabled.
+
+
+
+Next Steps:
+Go to your GitHub repository: Agro_direct_mobile_app
+You should see a yellow banner asking to "Compare & pull request".
+Click that button to create a Pull Request (PR) and merge your changes into master.
+This workflow (Branch -> PR -> Merge) is the standard and recommended way to update code on GitHub.
+
+e.g.
+
+bash
+git checkout -b new-feature
+# make changes
+git add .
+git commit -m "Add new feature 4/2/2026"
+git push -u origin new-feature
+# Then open PR on GitHub
