@@ -57,10 +57,11 @@ export default function MarketplaceScreen() {
 
     const FILTERS = ["Nearest", "Lowest Price", "Organic", "Bulk Available"];
 
-    // Mock wrapper to add missing UI fields if backend doesn't have them yet
+    // Map backend fields to display fields
     const getDisplayItem = (item: any) => ({
         ...item,
-        grade: item.grade || 'Grade A',
+        grade: item.quality || 'Grade A',
+        displayQuantity: item.quantity || '50 kg',
         distance: item.distance || `${Math.floor(Math.random() * 10) + 1} km`
     });
 

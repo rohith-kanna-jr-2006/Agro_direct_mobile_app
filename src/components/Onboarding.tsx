@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+// import { authAPI } from '../services/api'; // Not needed since no OTP
 
 const Onboarding = () => {
     const { user, role, completeOnboarding } = useAuth();
@@ -12,7 +13,7 @@ const Onboarding = () => {
 
     const [formData, setFormData] = useState({
         phone: '',
-        otp: '',
+        otp: '', // Kept for type stability, unused
         location: '',
         acres: '',
         crops: [] as string[],
@@ -20,31 +21,43 @@ const Onboarding = () => {
         preferences: [] as string[]
     });
 
-    const [otpSent, setOtpSent] = useState(false);
+    // Pre-fill phone from user object if available
+    useEffect(() => {
+        if (user?.phone && user.phone !== '0000000000') {
+            setFormData(prev => ({ ...prev, phone: user.phone || '' }));
+        }
+    }, [user]);
 
     const handleNext = async () => {
-        if (step < 3) setStep(step + 1);
-        else {
-            try {
-                await completeOnboarding(formData);
-                toast.success("Profile Setup Complete!");
-                navigate(role === 'farmer' ? '/farmer-dashboard' : '/buyer-dashboard');
-            } catch (error) {
-                toast.error("Failed to save profile. Please try again.");
-                console.error(error);
+        // Step 1: Phone Information (Common for all roles)
+        if (step === 1) {
+            if (formData.phone.length < 10) {
+                toast.error("Please enter a valid phone number");
+                return;
             }
+            // Proceed without OTP
+            setStep(step + 1);
+            return;
         }
-    };
 
-
-    const sendOtp = () => {
-        if (formData.phone.length === 10) {
-            setOtpSent(true);
-            toast.success("OTP sent to " + formData.phone);
+        // Subsequent Steps
+        if (step < 3) {
+            setStep(step + 1);
         } else {
-            toast.error("Please enter a valid 10-digit phone number");
+            submitProfile();
         }
     };
+
+    const submitProfile = async () => {
+        try {
+            await completeOnboarding(formData);
+            toast.success("Profile Setup Complete!");
+            navigate(role === 'farmer' ? '/farmer-dashboard' : '/buyer-dashboard');
+        } catch (error) {
+            toast.error("Failed to save profile. Please try again.");
+            console.error(error);
+        }
+    }
 
     const handleCropToggle = (crop: string) => {
         if (formData.crops.includes(crop)) {
@@ -60,33 +73,18 @@ const Onboarding = () => {
                 return (
                     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                         <h3>Step 1: Contact Information</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Verify your mobile number for secure transactions.</p>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Confirm your mobile number for secure transactions.</p>
                         <div style={{ marginBottom: '1.5rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Phone Number</label>
-                            <div style={{ display: 'flex', gap: '1rem' }}>
-                                <input
-                                    type="text"
-                                    placeholder="Insert 10 digits"
-                                    style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
-                                    value={formData.phone}
-                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                />
-                                <button onClick={sendOtp} className="btn-primary" style={{ padding: '0.8rem 1.5rem' }}>Send OTP</button>
-                            </div>
+                            <input
+                                type="text"
+                                placeholder="Insert 10 digits"
+                                style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            />
                         </div>
-                        {otpSent && (
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Enter OTP</label>
-                                <input
-                                    type="text"
-                                    placeholder="1234"
-                                    style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
-                                    value={formData.otp}
-                                    onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
-                                />
-                            </div>
-                        )}
-                        <button className="btn-primary" style={{ width: '100%', marginTop: '2rem' }} onClick={handleNext} disabled={!otpSent}>Next Step <ArrowRight size={18} /></button>
+                        <button className="btn-primary" style={{ width: '100%', marginTop: '2rem' }} onClick={handleNext}>Next Step <ArrowRight size={18} /></button>
                     </motion.div>
                 );
             case 2:
@@ -154,18 +152,20 @@ const Onboarding = () => {
             case 1:
                 return (
                     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                        <h3>Step 1: Business Identity</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Your business name or household identifier.</p>
+                        <h3>Step 1: Identity & Contact</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Your Personal name or contact details.</p>
+
                         <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Business / Name</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Phone Number</label>
                             <input
-                                type="text"
-                                placeholder="e.g. Fresh Mart Madurai"
+                                type="tel"
+                                placeholder="Contact Number"
                                 style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
-                                value={formData.businessName}
-                                onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                             />
                         </div>
+
                         <button className="btn-primary" style={{ width: '100%', marginTop: '2rem' }} onClick={handleNext}>Next Step <ArrowRight size={18} /></button>
                     </motion.div>
                 );
@@ -230,7 +230,7 @@ const Onboarding = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
                     <div>
                         <span style={{ color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', fontSize: '0.8rem' }}>Onboarding</span>
-                        <h2 style={{ fontSize: '1.8rem', marginTop: '0.5rem' }}>Welcome, {user?.name.split(' ')[0]}!</h2>
+                        <h2 style={{ fontSize: '1.8rem', marginTop: '0.5rem' }}>Welcome, {user?.name?.split(' ')[0] || 'User'}!</h2>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         {[1, 2, 3].map(i => (

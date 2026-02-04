@@ -1,4 +1,3 @@
-import { Sprout } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const Footer = () => {
@@ -9,7 +8,7 @@ const Footer = () => {
             <div className="container">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '2rem' }}>
                     <div className="logo" style={{ color: 'var(--primary)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Sprout size={24} />
+                        <img src="/img/farmdirect-logo.jpeg" alt="FarmDirect Logo" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} />
                         <span>FarmDirect</span>
                     </div>
                     <p style={{ color: 'var(--text-muted)' }}>© 2026 FarmDirect Technologies. {t('footer.tagline')}</p>

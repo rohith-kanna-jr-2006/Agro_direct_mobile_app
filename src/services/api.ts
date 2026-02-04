@@ -28,6 +28,8 @@ export const productAPI = {
 export const profileAPI = {
     get: (userId: string, role: string) => api.get(`/profile/${userId}/${role}`),
     update: (profileData: any) => api.post('/profile', profileData),
+    getProfile: (userId: string, role: string) => api.get(`/profile/${userId}/${role}`),
+    updateProfile: (profileData: any) => api.post('/profile', profileData),
     getAnalytics: () => api.get('/analytics'),
 };
 

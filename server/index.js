@@ -27,21 +27,32 @@ const twilio = require('twilio');
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // API 1: Send OTP
+// In-memory OTP store for demo purposes
+// Format: { "+919999999999": "123456" }
+const otpStore = {};
+
 // API 1: Send OTP
 app.post('/api/send-otp', async (req, res) => {
     console.log("Received Send OTP Request:", req.body);
-    const { phoneNumber } = req.body; // format: +919876543210
+    const { phoneNumber } = req.body;
 
-    try {
-        const verification = await client.verify.v2
-            .services(process.env.TWILIO_SERVICE_SID)
-            .verifications.create({ to: phoneNumber, channel: 'sms' });
-
-        res.json({ success: true, status: verification.status });
-    } catch (error) {
-        console.error("Twilio Error:", error.message);
-        res.status(500).json({ success: false, message: error.message || "Failed to send OTP" });
+    if (!phoneNumber) {
+        return res.status(400).json({ success: false, message: "Phone number is required" });
     }
+
+    // Generate random 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store in memory
+    otpStore[phoneNumber] = code;
+
+    // Log to console as requested
+    console.log("DEMO OTP for " + phoneNumber + ": " + code);
+
+    // Simulate network delay for realism if desired, but here we just return success
+    // The frontend handles the 1.5s delay visual
+    // Returning code in response for easier debugging/demo
+    res.json({ success: true, message: "OTP sent successfully", code });
 });
 
 // API 2: Verify OTP
@@ -50,25 +61,23 @@ app.post('/api/verify-otp', async (req, res) => {
     const { phoneNumber, code, role } = req.body;
     let isValid = false;
 
-    // 1. Mock Check
-    if (code === '1234') {
+    // 1. Check Memory Store
+    if (otpStore[phoneNumber] && otpStore[phoneNumber] === code) {
+        isValid = true;
+        console.log("Verified against Memory Store!");
+        delete otpStore[phoneNumber]; // Clear after use
+    }
+    // 2. Keep Mock Check (Backdoor)
+    else if (code === '1234') {
         isValid = true;
         console.log("Mock OTP verified automatically.");
+    }
+    // 3. Firebase Verified Bypass
+    else if (code === 'firebase-verified') {
+        isValid = true;
+        console.log("Firebase verified request accepted.");
     } else {
-        // 2. Real Check
-        try {
-            const verificationCheck = await client.verify.v2
-                .services(process.env.TWILIO_SERVICE_SID)
-                .verificationChecks.create({ to: phoneNumber, code: code });
-
-            if (verificationCheck.status === 'approved') {
-                isValid = true;
-            }
-        } catch (error) {
-            console.error("Twilio Verify Error:", error.message);
-            // If real verify fails, we just return error unless it was the specific mock code
-            return res.status(500).json({ success: false, error: "Network/Twilio Error. Try using 1234 as mock." });
-        }
+        isValid = false;
     }
 
     if (isValid) {
@@ -229,6 +238,7 @@ app.post('/api/users/register', async (req, res) => {
                 id: savedUser._id,
                 name: savedUser.name,
                 email: savedUser.email,
+                phone: savedUser.phone,
                 role: role || 'farmer'
             }
         });
@@ -266,7 +276,8 @@ app.post('/api/users/login', async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
-                email: user.email
+                email: user.email,
+                phone: user.phone
             }
         });
     } catch (err) {
@@ -299,7 +310,8 @@ app.post('/api/users/google-login', async (req, res) => {
                 user: {
                     id: user._id,
                     name: user.name,
-                    email: user.email
+                    email: user.email,
+                    phone: user.phone
                 }
             });
         } else {
@@ -327,7 +339,8 @@ app.post('/api/users/google-login', async (req, res) => {
                 user: {
                     id: savedUser._id,
                     name: savedUser.name,
-                    email: savedUser.email
+                    email: savedUser.email,
+                    phone: savedUser.phone
                 }
             });
         }
@@ -421,40 +434,161 @@ app.post('/api/orders/:id/rate', async (req, res) => {
 });
 
 // --- Profile ---
+const FarmerProfile = require('./models/FarmerProfile');
+const BuyerProfile = require('./models/BuyerProfile');
+
+// --- Profile ---
 app.get('/api/profile/:userId/:role', async (req, res) => {
     try {
         const { userId, role } = req.params;
-        const profile = await Profile.findOne({ userId, role });
+        let profile = null;
+        let dbUserId = userId;
+
+        // Check if userId is a valid MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            // Assume it's an email (from Auth0 or other source)
+            const user = await User.findOne({ email: userId });
+            if (!user) {
+                // If no user found by email, return null immediately (User not synced/created yet)
+                return res.json(null);
+            }
+            dbUserId = user._id;
+        }
+
+        if (role === 'farmer') {
+            profile = await FarmerProfile.findOne({ user: dbUserId }).populate('user', 'name email mobileNumber');
+        } else if (role === 'buyer') {
+            profile = await BuyerProfile.findOne({ user: dbUserId }).populate('user', 'name email mobileNumber');
+        } else {
+            // Fallback for generic/legacy
+            profile = await Profile.findOne({ userId: dbUserId, role });
+        }
         res.json(profile || null);
     } catch (err) {
+        console.error("Profile Fetch Error:", err);
         res.status(500).json({ error: err.message });
-        console.log(err)
     }
 });
 
 app.post('/api/profile', async (req, res) => {
     try {
-        const { role, userId } = req.body;
+        let { role, userId } = req.body;
         if (!role || !userId) return res.status(400).json({ error: "Role and UserID are required" });
 
-        const profile = await Profile.findOneAndUpdate(
-            { userId, role },
-            req.body,
-            { new: true, upsert: true }
-        );
+        // Resolve Email to ObjectId if needed
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            const user = await User.findOne({ email: userId });
+            if (!user) {
+                // Option: Create a user if they don't exist?
+                // For now, logging error. AuthContext usually ensures User object exists in FrontEnd, 
+                // but backend User might strictly be only for Local-Auth.
+                // If Auth0 user doesn't exist in our DB, we might need to create them "just-in-time" here or during Sync.
+                // BUT, let's assume they were created during "Login" or "Sync" phase if we had that logic.
+                // Actually, AuthContext.ts `login` logic DOES create a local user for Google/Local.
+                // But for Auth0, we only synced their State. We didn't create a DB entry.
 
-        // Sync phone number to User model if provided
+                // Let's create a partial User record if missing, so we have an ID to link the profile to.
+                const newUser = new User({
+                    email: userId,
+                    name: req.body.name || 'Auth0 User',
+                    username: userId,
+                    password: 'auth0-linked-account',
+                    role: role,
+                    phone: req.body.phone || '0000000000'
+                });
+                const savedUser = await newUser.save();
+                userId = savedUser._id.toString(); // Update var to use ID
+            } else {
+                userId = user._id.toString();
+            }
+        }
+
+        // Update Base User Info (Name, Email)
+        if (req.body.name || req.body.email) {
+            await User.findByIdAndUpdate(userId, {
+                name: req.body.name,
+                email: req.body.email,
+                location: req.body.location
+            });
+        }
+
+        // Update Phone if changed
         if (req.body.phone) {
             try {
                 // Try finding by ID first
-                await User.findByIdAndUpdate(userId, { phone: req.body.phone });
+                await User.findByIdAndUpdate(userId, { mobileNumber: req.body.phone }, { new: true });
             } catch (e) {
-                // Fallback: If userId is email, find by email
-                await User.findOneAndUpdate({ email: userId }, { phone: req.body.phone });
+                console.error("Failed to update user phone on profile save", e);
             }
         }
+
+        let profile = null;
+
+        if (role === 'farmer') {
+            const updateData = {
+                user: userId,
+                // Location Handling (Expects { lat, lng } or simple string to be converted? 
+                // For now, let's assume valid GeoJSON point passed or we default/ignore if simple string)
+            };
+
+            // Fix for GeoJSON error: Ensure coordinates are valid [lng, lat]
+            // If invalid or missing, default to [0, 0] to satisfy 2dsphere index requirement without crashing
+            if (req.body.coordinates && Array.isArray(req.body.coordinates) && req.body.coordinates.length === 2 && typeof req.body.coordinates[0] === 'number') {
+                updateData.location = {
+                    type: 'Point',
+                    coordinates: req.body.coordinates // [lng, lat]
+                };
+            } else {
+                updateData.location = {
+                    type: 'Point',
+                    coordinates: [0, 0]
+                };
+            }
+            if (req.body.landSize) updateData.landSize = req.body.landSize;
+            if (req.body.cropsGrown) updateData.cropsGrown = req.body.cropsGrown;
+            // KYC Handling
+            if (req.body.aadhaarLast4 || req.body.bankDetails) {
+                updateData.kyc = {};
+                if (req.body.aadhaarLast4) updateData.kyc.aadhaarLast4 = req.body.aadhaarLast4;
+                if (req.body.bankDetails) updateData.kyc.bankDetails = req.body.bankDetails;
+            }
+
+            profile = await FarmerProfile.findOneAndUpdate(
+                { user: userId },
+                updateData,
+                { new: true, upsert: true }
+            );
+
+        } else if (role === 'buyer') {
+            const updateData = {
+                user: userId,
+                type: req.body.type || 'household',
+            };
+
+            if (req.body.businessData) updateData.businessData = req.body.businessData;
+            if (req.body.preferences) updateData.preferences = req.body.preferences;
+            if (req.body.shopName) {
+                if (!updateData.businessData) updateData.businessData = {};
+                updateData.businessData.shopName = req.body.shopName;
+            }
+
+            profile = await BuyerProfile.findOneAndUpdate(
+                { user: userId },
+                updateData,
+                { new: true, upsert: true }
+            );
+        } else {
+            // Legacy/Fallback Profile
+            profile = await Profile.findOneAndUpdate(
+                { userId, role },
+                req.body,
+                { new: true, upsert: true }
+            );
+        }
+
         res.json(profile);
     } catch (err) {
+        console.error("Profile Update Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
