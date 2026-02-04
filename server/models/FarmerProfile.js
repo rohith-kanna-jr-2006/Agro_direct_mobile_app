@@ -9,10 +9,10 @@ const farmerProfileSchema = new mongoose.Schema({
     landSize: { type: Number, required: true }, // in acres
     cropsGrown: [{ type: String }],
     kyc: {
-        aadhaarLast4: { type: String, required: true },
+        aadhaarLast4: { type: String },
         bankDetails: {
-            accountNumber: { type: String, required: true },
-            ifsc: { type: String, required: true }
+            accountNumber: { type: String },
+            ifsc: { type: String }
             // Note: Bank details should be encrypted before storage in a real production environment
         }
     }

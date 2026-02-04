@@ -17,6 +17,7 @@ import Hero from './components/Hero';
 import Login from './components/Login';
 import MarketplacePreview from './components/MarketplacePreview';
 import Onboarding from './components/Onboarding';
+import Settings from './components/Settings';
 
 // --- Helper Components ---
 const ScrollToTop = () => {
@@ -162,6 +163,12 @@ const App = () => {
           <Route path="/farmer-dashboard" element={
             <ProtectedRoute requiredRole="farmer">
               <AppLayout><FarmerDashboard /></AppLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <AppLayout><Settings /></AppLayout>
             </ProtectedRoute>
           } />
 

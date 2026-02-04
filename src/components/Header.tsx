@@ -38,7 +38,7 @@ const Header = () => {
         <nav style={{ position: 'relative' }}>
             <div className="container nav-content">
                 <Link to="/" className="logo" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <img src="/img/farmdirect-logo.jpeg" alt="FarmDirect Logo" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
+                    <img src="/img/farmdirect logo.jpeg" alt="FarmDirect Logo" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
                     <span>FarmDirect</span>
                 </Link>
 

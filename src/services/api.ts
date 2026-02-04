@@ -16,6 +16,11 @@ export const authAPI = {
     registerPhone: (userData: any) => api.post('/users/register-phone', userData),
     sendOtp: (phoneNumber: string) => api.post('/send-otp', { phoneNumber }),
     verifyOtp: (data: { phoneNumber: string, code: string, role?: string }) => api.post('/verify-otp', data),
+    checkUsername: (username: string) => api.post('/users/check-username', { username }),
+    updatePassword: (data: { userId: string, currentPassword: string, newPassword: string }) => api.post('/users/update-password', data),
+    toggleMfa: (data: { userId: string, enable: boolean }) => api.post('/users/toggle-mfa', data),
+    verifyMfa: (data: { identifier: string, code: string }) => api.post('/users/verify-mfa', data),
+    getUser: (userId: string) => api.get(`/users/${userId}`),
 };
 
 export const productAPI = {

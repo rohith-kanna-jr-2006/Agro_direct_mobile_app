@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, IndianRupee, LayoutDashboard, Mail, MapPin, Package, Phone, Plus, Printer, Settings, ShieldCheck, Sprout, TrendingUp, User } from 'lucide-react';
+import { Bell, Eye, EyeOff, IndianRupee, LayoutDashboard, Mail, MapPin, Package, Phone, Plus, Printer, Settings, ShieldCheck, Sprout, TrendingUp, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -360,17 +360,24 @@ const FarmerDashboard = () => {
 const ProfileForm = ({ user, role }: { user: any, role: string }) => {
     const [formData, setFormData] = useState({
         name: user?.name || '',
+        username: user?.username || '',
         email: user?.email || '',
         phone: user?.phone || '',
         location: user?.location || '',
+        password: '',
+        confirmPassword: '',
         landSize: '',
         cropsGrown: '',
         aadhaarLast4: '',
         // Buyer fields
         type: 'household',
         shopName: '',
-        preferences: ''
+        preferences: '',
+        isMfaVerified: user?.isMfaVerified || false
     });
+
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -381,13 +388,18 @@ const ProfileForm = ({ user, role }: { user: any, role: string }) => {
                         const d = res.data;
                         setFormData(prev => ({
                             ...prev,
+                            name: d.user?.name || prev.name,
+                            username: d.user?.username || prev.username,
+                            phone: d.user?.mobileNumber || prev.phone,
+                            location: d.user?.location || prev.location,
                             landSize: d.landSize?.toString() || '',
                             cropsGrown: d.cropsGrown?.join(', ') || '',
                             aadhaarLast4: d.kyc?.aadhaarLast4 || '',
                             // Buyer specific
                             type: d.type || 'household',
                             shopName: d.businessData?.shopName || '',
-                            preferences: d.preferences?.join(', ') || ''
+                            preferences: d.preferences?.join(', ') || '',
+                            isMfaVerified: d.user?.isMfaVerified || false
                         }));
                     }
                 } catch (e) { console.error(e); }
@@ -396,15 +408,60 @@ const ProfileForm = ({ user, role }: { user: any, role: string }) => {
         fetchProfile();
     }, [user, role]);
 
+    const validateUsername = (username: string) => {
+        if (username.length < 4) return "Minimum 4 characters required";
+        if (!/[a-z]/.test(username)) return "Must include a lowercase letter";
+        if (!/[A-Z]/.test(username)) return "Must include an uppercase letter";
+        if (!/[0-9]/.test(username)) return "Must include a number";
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(username)) return "Must include a special character";
+        return "";
+    };
+
+    const validatePassword = (pass: string) => {
+        if (!pass) return ""; // Password change is optional
+        if (pass.length < 8) return "Password must be at least 8 characters";
+        if (!/[a-z]/.test(pass)) return "Password must include a lowercase letter";
+        if (!/[A-Z]/.test(pass)) return "Password must include an uppercase letter";
+        if (!/[0-9]/.test(pass)) return "Password must include a number";
+        if (!/[@$!%*?&]/.test(pass)) return "Password must include a special character (@, $, !, %, *, ?, &)";
+        if (/\s/.test(pass)) return "Password cannot contain whitespace";
+        return "";
+    };
+
     const handleSave = async () => {
+        const usernameError = validateUsername(formData.username);
+        if (usernameError) {
+            toast.error(usernameError);
+            return;
+        }
+
+        if (formData.password) {
+            const passError = validatePassword(formData.password);
+            if (passError) {
+                toast.error(passError);
+                return;
+            }
+            if (formData.password !== formData.confirmPassword) {
+                toast.error("Passwords do not match");
+                return;
+            }
+        }
+
         try {
             const payload: any = {
-                userId: user.id || user._id || user.email,
+                userId: user.userId || user.id || user._id || user.email,
                 role,
                 name: formData.name,
+                username: formData.username,
                 phone: formData.phone,
-                email: formData.email, // Read only but sending back
+                email: formData.email,
+                location: formData.location,
+                isMfaVerified: formData.isMfaVerified,
             };
+
+            if (formData.password) {
+                payload.password = formData.password;
+            }
 
             if (role === 'farmer') {
                 payload.landSize = Number(formData.landSize);
@@ -449,6 +506,15 @@ const ProfileForm = ({ user, role }: { user: any, role: string }) => {
             </div>
 
             <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Username</label>
+                <div style={{ position: 'relative' }}>
+                    <User size={18} className="input-icon" style={{ color: 'var(--primary)' }} />
+                    <input type="text" value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} className="premium-input with-icon" placeholder="Unique username" />
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>4+ chars, A-Z, a-z, 0-9, special char</p>
+            </div>
+
+            <div className="input-group">
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Email Address</label>
                 <div style={{ position: 'relative' }}>
                     <Mail size={18} className="input-icon" />
@@ -469,6 +535,73 @@ const ProfileForm = ({ user, role }: { user: any, role: string }) => {
                 <div style={{ position: 'relative' }}>
                     <MapPin size={18} className="input-icon" />
                     <input type="text" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="premium-input with-icon" />
+                </div>
+            </div>
+
+            <div style={{ gridColumn: 'span 2', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                <h4 style={{ marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <ShieldCheck size={18} /> Account Security
+                </h4>
+            </div>
+
+            <div className="input-group" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(76, 175, 80, 0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(76, 175, 80, 0.1)' }}>
+                <div>
+                    <h5 style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Two-Factor Authentication</h5>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Secure your account with an additional verification layer.</p>
+                </div>
+                <div
+                    onClick={() => setFormData({ ...formData, isMfaVerified: !formData.isMfaVerified })}
+                    style={{
+                        width: '50px',
+                        height: '26px',
+                        background: formData.isMfaVerified ? 'var(--primary)' : 'var(--text-muted)',
+                        borderRadius: '13px',
+                        position: 'relative',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                    }}
+                >
+                    <div style={{
+                        width: '20px',
+                        height: '20px',
+                        background: 'white',
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: '3px',
+                        left: formData.isMfaVerified ? '27px' : '3px',
+                        transition: 'all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+                    }} />
+                </div>
+            </div>
+
+            <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>New Password</label>
+                <div style={{ position: 'relative' }}>
+                    <ShieldCheck size={18} className="input-icon" />
+                    <input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="premium-input with-icon" placeholder="Leave blank to keep current" style={{ paddingRight: '2.5rem' }} />
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                    >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Min 8 chars, A-Z, a-z, 0-9, @$!%*?&</p>
+            </div>
+
+            <div className="input-group">
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Confirm Password</label>
+                <div style={{ position: 'relative' }}>
+                    <ShieldCheck size={18} className="input-icon" />
+                    <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} className="premium-input with-icon" style={{ paddingRight: '2.5rem' }} />
+                    <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                    >
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                 </div>
             </div>
 

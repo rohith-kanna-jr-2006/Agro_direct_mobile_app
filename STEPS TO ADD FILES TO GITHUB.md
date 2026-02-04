@@ -57,7 +57,7 @@ e.g.
 bash
 git checkout -b new-feature
 # make changes
-git add .
-git commit -m "Add new feature 4/2/2026"
+git add .;
+git commit -m "Add new feature 4/2/2026 v2";
 git push -u origin new-feature
 # Then open PR on GitHub
