@@ -11,6 +11,7 @@ const productSchema = new mongoose.Schema({
   farmerName: String,
   farmerContact: String,
   farmerAddress: String,
+  userId: String,       // Unique identifier (email or ID)
   rating: { type: String, default: '5.0' },
   quality: String,      // Added for AI grading result
   quantity: String,     // Added for quantity + unit

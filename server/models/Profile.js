@@ -17,7 +17,7 @@ const profileSchema = new mongoose.Schema({
         bankName: String
     },
     buyerDetails: {
-        subRole: { type: String, enum: ['consumer', 'business'] },
+        subRole: { type: String, enum: ['consumer', 'business', 'hotel'] },
         businessName: String,
         interests: [String],
         weeklyRequirement: String

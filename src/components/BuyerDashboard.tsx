@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Filter, Leaf, Mail, MapPin, Mic, Minus, Phone, Plus, Search as SearchIcon, ShieldCheck, ShoppingBag, ShoppingCart, User, X } from 'lucide-react';
+import { Calendar, Download, Eye, EyeOff, FileText, Filter, Leaf, Mail, MapPin, Mic, Minus, Phone, Plus, Printer, Search as SearchIcon, ShieldCheck, ShoppingBag, ShoppingCart, User, X } from 'lucide-react';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
@@ -10,7 +10,7 @@ import { orderAPI, productAPI, profileAPI } from '../services/api';
 import LiveTracking from './LiveTracking';
 import Profile from './Profile';
 
-const ProductCard = ({ item, onAddToCart, onOpenDetail, t }: { item: any; onAddToCart: (qty: number) => void; onOpenDetail: () => void; t: any }) => {
+const ProductCard = ({ item, onAddToCart, onOpenDetail, onQuickView, t }: { item: any; onAddToCart: (qty: number) => void; onOpenDetail: () => void; onQuickView: () => void; t: any }) => {
     const [qty, setQty] = useState(1);
 
     const increment = (e: React.MouseEvent) => {
@@ -34,7 +34,12 @@ const ProductCard = ({ item, onAddToCart, onOpenDetail, t }: { item: any; onAddT
                     alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s',
                     cursor: 'pointer'
                 }}>
-                    <button style={{ padding: '0.5rem 1rem', background: 'white', border: 'none', borderRadius: '20px', fontWeight: 600 }}>Quick View</button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onQuickView(); }}
+                        style={{ padding: '0.5rem 1rem', background: 'white', border: 'none', borderRadius: '20px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                        Quick View
+                    </button>
                 </div>
                 <style>{`.product-image-container:hover .quick-view-overlay { opacity: 1; }`}</style>
             </div>
@@ -91,9 +96,11 @@ const BuyerDashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('marketplace'); // 'marketplace' or 'profile'
+    const [view, setView] = useState('marketplace'); // 'marketplace' or 'profile' or 'orders' or 'statement'
     const [showCart, setShowCart] = useState(false);
     const [cartItems, setCartItems] = useState<any[]>([]);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
     // Filter States
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -136,8 +143,10 @@ const BuyerDashboard = () => {
     const fetchOrders = async () => {
         try {
             const response = await orderAPI.getAll();
-            // Filter orders for this user
-            const userOrders = response.data.filter((o: any) => o.userId === user?.email);
+            // Filter orders for this user (robust check for email or id)
+            const userOrders = response.data.filter((o: any) =>
+                o.userId === user?.email || o.userId === user?.userId || o.userName === user?.name
+            );
             setOrders(userOrders);
         } catch (err) {
             console.error("Failed to fetch orders:", err);
@@ -182,12 +191,15 @@ const BuyerDashboard = () => {
                 quantity: item.qty || 1,
                 paymentMethod: paymentMethod,
                 farmer: {
+                    id: item.farmerContact || item.farm || "Generic", // Use contact/email as unique ID
                     name: item.farm || item.farmerName || "Verified Farmer",
                     address: item.dist ? `${item.dist} away` : "Local",
                     rating: item.grade || "5.0"
                 },
+                productId: item._id, // Add productId for inventory management
                 userId: user?.email,
                 userName: user?.name,
+                userUsername: user?.username,
                 userAddress: user?.location || "Madurai, TN"
             };
             return orderAPI.create(orderData);
@@ -406,6 +418,28 @@ const BuyerDashboard = () => {
                         >
                             <User size={22} />
                         </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.05, y: -2 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setView('statement')}
+                            style={{
+                                width: '54px',
+                                height: '54px',
+                                background: view === 'statement' ? 'var(--primary)' : 'var(--surface)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '18px',
+                                color: view === 'statement' ? 'white' : 'var(--text-muted)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.3s ease',
+                                boxShadow: view === 'statement' ? '0 8px 20px var(--primary-glow)' : '0 8px 20px rgba(0,0,0,0.2)'
+                            }}
+                        >
+                            <FileText size={22} />
+                        </motion.button>
                     </div>
                 </div>
             </motion.div>
@@ -491,6 +525,10 @@ const BuyerDashboard = () => {
                                             onOpenDetail={() => {
                                                 navigate(`/product/${item._id || item.key}`);
                                             }}
+                                            onQuickView={() => {
+                                                setSelectedProduct(item);
+                                                setShowProductDetail(true);
+                                            }}
                                             t={t}
                                         />
                                     ))}
@@ -523,6 +561,7 @@ const BuyerDashboard = () => {
                                                 <ShoppingBag size={28} />
                                             </div>
                                             <div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 800, marginBottom: '0.4rem', textTransform: 'uppercase' }}>Order #${order.trackingId || order._id.slice(-6).toUpperCase()}</div>
                                                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{order.productName}</h3>
                                                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Ordered on {new Date(order.date).toLocaleDateString()}</p>
                                                 <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
@@ -549,6 +588,168 @@ const BuyerDashboard = () => {
                                 ))}
                             </div>
                         )}
+                    </div>
+                ) : view === 'statement' ? (
+                    <div style={{ flex: 1 }}>
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="premium-card"
+                            style={{ padding: '2rem' }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+                                <div>
+                                    <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.5rem' }}>Purchase Statements</h2>
+                                    <p style={{ color: 'var(--text-muted)' }}>Review and export your spending history.</p>
+                                </div>
+                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                    <button
+                                        onClick={() => {
+                                            const filtered = orders.filter(o => {
+                                                const d = new Date(o.date);
+                                                const s = startDate ? new Date(startDate) : null;
+                                                const e = endDate ? new Date(endDate) : null;
+                                                if (s && d < s) return false;
+                                                if (e && d > e) return false;
+                                                return true;
+                                            });
+                                            const csv = "Date,Order ID,Product,Quantity,Amount,Farmer\n" +
+                                                filtered.map(o => `${new Date(o.date).toLocaleDateString()},${o.trackingId || o._id},${o.productName},${o.quantity},₹${o.totalPrice},${o.farmer?.name || 'Farmer'}`).join("\n");
+                                            const blob = new Blob([csv], { type: 'text/csv' });
+                                            const url = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `Purchase_Statement_${startDate || 'All'}.csv`;
+                                            a.click();
+                                        }}
+                                        className="btn-primary"
+                                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'white' }}
+                                    >
+                                        <Download size={18} /> CSV
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const filtered = orders.filter(o => {
+                                                const d = new Date(o.date);
+                                                const s = startDate ? new Date(startDate) : null;
+                                                const e = endDate ? new Date(endDate) : null;
+                                                if (s && d < s) return false;
+                                                if (e && d > e) return false;
+                                                return true;
+                                            });
+                                            const printWindow = window.open('', '_blank');
+                                            if (!printWindow) return;
+                                            const html = `
+                                                <html>
+                                                    <head>
+                                                        <title>Purchase Statement - ${user?.name}</title>
+                                                        <style>
+                                                            body { font-family: 'Inter', sans-serif; padding: 40px; color: #333; }
+                                                            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #4CAF50; padding-bottom: 20px; margin-bottom: 30px; }
+                                                            .title { font-size: 24px; font-weight: 800; color: #4CAF50; }
+                                                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                                                            th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+                                                            td { padding: 12px; border-bottom: 1px solid #eee; }
+                                                            .total { font-weight: 800; font-size: 18px; text-align: right; margin-top: 20px; }
+                                                            .footer { margin-top: 50px; font-size: 12px; color: #999; text-align: center; }
+                                                        </style>
+                                                    </head>
+                                                    <body>
+                                                        <div class="header">
+                                                            <div>
+                                                                <div class="title">FarmDirect - Purchase Statement</div>
+                                                                <div>Customer: ${user?.name}</div>
+                                                                <div>Period: ${startDate || 'inception'} to ${endDate || 'present'}</div>
+                                                            </div>
+                                                            <div style="text-align: right">
+                                                                <div>Date: ${new Date().toLocaleDateString()}</div>
+                                                                <div>Total Spent: ₹${filtered.reduce((sum, o) => sum + (o.totalPrice || 0), 0)}</div>
+                                                            </div>
+                                                        </div>
+                                                        <table>
+                                                            <thead>
+                                                                <tr><th>Date</th><th>Order ID</th><th>Product</th><th>Qty</th><th>Farmer</th><th style="text-align: right">Amount</th></tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                ${filtered.map(o => `
+                                                                    <tr>
+                                                                        <td>${new Date(o.date).toLocaleDateString()}</td>
+                                                                        <td>#${o.trackingId || o._id.slice(-6).toUpperCase()}</td>
+                                                                        <td>${o.productName}</td>
+                                                                        <td>${o.quantity}</td>
+                                                                        <td>${o.farmer?.name || 'Local Farmer'}</td>
+                                                                        <td style="text-align: right">₹${o.totalPrice}</td>
+                                                                    </tr>
+                                                                `).join('')}
+                                                            </tbody>
+                                                        </table>
+                                                        <div class="total">Total Expenditure: ₹${filtered.reduce((sum, o) => sum + (o.totalPrice || 0), 0)}</div>
+                                                        <div class="footer">This is a system generated statement from FarmDirect.</div>
+                                                        <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); };</script>
+                                                    </body>
+                                                </html>
+                                            `;
+                                            printWindow.document.write(html);
+                                            printWindow.document.close();
+                                        }}
+                                        className="btn-primary"
+                                    >
+                                        <Printer size={18} /> PDF
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>From Date</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <Calendar size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }} />
+                                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ width: '100%', padding: '0.8rem 1rem 0.8rem 3rem', background: 'var(--background)', border: '1px solid var(--border)', color: 'white', borderRadius: '10px' }} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>To Date</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <Calendar size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }} />
+                                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ width: '100%', padding: '0.8rem 1rem 0.8rem 3rem', background: 'var(--background)', border: '1px solid var(--border)', color: 'white', borderRadius: '10px' }} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead style={{ borderBottom: '2px solid var(--border)' }}>
+                                        <tr>
+                                            <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Date</th>
+                                            <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Order ID</th>
+                                            <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Product</th>
+                                            <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Quantity</th>
+                                            <th style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-muted)' }}>Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {orders
+                                            .filter(o => {
+                                                const d = new Date(o.date);
+                                                const s = startDate ? new Date(startDate) : null;
+                                                const e = endDate ? new Date(endDate) : null;
+                                                if (s && d < s) return false;
+                                                if (e && d > e) return false;
+                                                return true;
+                                            })
+                                            .map((o, i) => (
+                                                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                    <td style={{ padding: '1rem' }}>{new Date(o.date).toLocaleDateString()}</td>
+                                                    <td style={{ padding: '1rem', fontWeight: 600 }}>#{o.trackingId || o._id.slice(-6).toUpperCase()}</td>
+                                                    <td style={{ padding: '1rem' }}>{o.productName}</td>
+                                                    <td style={{ padding: '1rem' }}>{o.quantity}</td>
+                                                    <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 700 }}>₹{o.totalPrice}</td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </motion.div>
                     </div>
                 ) : (
                     <div className="premium-card" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
@@ -726,12 +927,16 @@ const BuyerDashboard = () => {
                                     <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><User size={18} /> Farmer Details</h4>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                         <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <User size={24} />
+                                            {selectedProduct.farmerImg ? (
+                                                <img src={selectedProduct.farmerImg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <User size={24} />
+                                            )}
                                         </div>
                                         <div>
-                                            <p style={{ fontWeight: 700 }}>{selectedProduct.farm || selectedProduct.farmerName || 'Verified Farmer'}</p>
+                                            <p style={{ fontWeight: 700 }}>{selectedProduct.farmerName || selectedProduct.farm || 'Verified Farmer'}</p>
                                             <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                                <MapPin size={14} /> {selectedProduct.dist || 'Local'} - Coimbatore, TN
+                                                <MapPin size={14} /> {selectedProduct.farmerAddress || 'Village: Melur, Dist: Madurai'}
                                             </p>
                                         </div>
                                     </div>
@@ -996,7 +1201,7 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
                 payload.password = formData.password;
             }
 
-            if (formData.type === 'retailer') {
+            if (formData.type === 'retailer' || formData.type === 'hotel') {
                 payload.businessData = {
                     shopName: formData.shopName,
                     gstNumber: formData.gstNumber
@@ -1072,32 +1277,56 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
                 </h4>
             </div>
 
-            <div className="input-group" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(76, 175, 80, 0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(76, 175, 80, 0.1)', marginBottom: '1rem' }}>
-                <div>
-                    <h5 style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Authentication Security</h5>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Status: {formData.isMfaVerified ? <span style={{ color: '#4CAF50', fontWeight: 600 }}>Verified ✅</span> : <span style={{ color: '#ff4444' }}>Not Verified ❌</span>}
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={handleVerifyMFA}
-                    className="btn-primary"
-                    style={{
-                        padding: '0.6rem 1.2rem',
-                        fontSize: '0.85rem',
-                        background: formData.isMfaVerified ? 'rgba(76, 175, 80, 0.2)' : 'var(--primary)',
-                        color: formData.isMfaVerified ? '#4CAF50' : 'white',
-                        border: formData.isMfaVerified ? '1px solid #4CAF50' : 'none',
-                        cursor: formData.isMfaVerified ? 'default' : 'pointer',
+            <div className="input-group" style={{
+                gridColumn: 'span 2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: formData.isMfaVerified ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.05)',
+                padding: '1.2rem',
+                borderRadius: '16px',
+                border: formData.isMfaVerified ? '1px solid rgba(76, 175, 80, 0.2)' : '1px solid rgba(255, 152, 0, 0.1)',
+                marginBottom: '1rem'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        background: formData.isMfaVerified ? 'var(--primary)' : 'rgba(255, 152, 0, 0.2)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <ShieldCheck size={16} />
-                    {formData.isMfaVerified ? 'MFA Verified' : 'Verify MFA'}
-                </button>
+                        justifyContent: 'center',
+                        color: 'white'
+                    }}>
+                        <ShieldCheck size={24} />
+                    </div>
+                    <div>
+                        <h5 style={{ fontWeight: 700, marginBottom: '0.2rem', fontSize: '1rem' }}>
+                            {formData.isMfaVerified ? 'Account Identity Secured' : 'Secure Your Account'}
+                        </h5>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {formData.isMfaVerified
+                                ? 'Your identity is verified via Multi-Factor Authentication.'
+                                : 'Enable MFA to protect your account from unauthorized access.'}
+                        </p>
+                    </div>
+                </div>
+
+                {!formData.isMfaVerified ? (
+                    <button
+                        type="button"
+                        onClick={handleVerifyMFA}
+                        className="btn-primary"
+                        style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem' }}
+                    >
+                        Verify Now
+                    </button>
+                ) : (
+                    <div style={{ color: 'var(--primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
+                        Verified ✅
+                    </div>
+                )}
             </div>
             <div className="input-group">
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>New Password</label>
@@ -1141,10 +1370,11 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
                 <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} className="premium-input" style={{ width: '100%' }}>
                     <option value="household">Household Consumer</option>
                     <option value="retailer">Retailer / Business</option>
+                    <option value="hotel">Hotel / Restaurant</option>
                 </select>
             </div>
 
-            {formData.type === 'retailer' && (
+            {(formData.type === 'retailer' || formData.type === 'hotel') && (
                 <>
                     <div className="input-group">
                         <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Shop Name</label>

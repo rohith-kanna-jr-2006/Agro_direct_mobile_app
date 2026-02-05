@@ -22,6 +22,7 @@ const Onboarding = () => {
         acres: '',
         crops: [] as string[],
         businessName: '',
+        buyerType: 'household' as 'household' | 'retailer' | 'hotel',
         preferences: [] as string[]
     });
 
@@ -446,7 +447,49 @@ const Onboarding = () => {
                 return (
                     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                         <h3>Step 3: Purchasing Preferences</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>What produce do you buy regularly?</p>
+
+                        <div style={{ marginBottom: '2rem' }}>
+                            <label style={{ display: 'block', marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Buyer Entity Type</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                                {[
+                                    { id: 'household', label: 'Household', icon: '🏠' },
+                                    { id: 'retailer', label: 'Retailer', icon: '🏪' },
+                                    { id: 'hotel', label: 'Hotel', icon: '🏨' }
+                                ].map(type => (
+                                    <div
+                                        key={type.id}
+                                        onClick={() => setFormData({ ...formData, buyerType: type.id as any })}
+                                        style={{
+                                            padding: '1rem',
+                                            borderRadius: '12px',
+                                            border: `1px solid ${formData.buyerType === type.id ? 'var(--primary)' : 'var(--border)'}`,
+                                            background: formData.buyerType === type.id ? 'rgba(76, 175, 80, 0.1)' : 'var(--background)',
+                                            cursor: 'pointer',
+                                            textAlign: 'center',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{type.icon}</div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{type.label}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {formData.buyerType !== 'household' && (
+                            <div style={{ marginBottom: '2rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>{formData.buyerType === 'hotel' ? 'Hotel/Restaurant Name' : 'Business/Shop Name'}</label>
+                                <input
+                                    type="text"
+                                    placeholder={formData.buyerType === 'hotel' ? "e.g. Grand Plaza Hotel" : "e.g. Fresh Mart Retail"}
+                                    style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white' }}
+                                    value={formData.businessName}
+                                    onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                                />
+                            </div>
+                        )}
+
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>What produce do you buy regularly?</p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
                             {['Vegetables', 'Fruits', 'Grains', 'Organic Only', 'Bulk Deals', 'Daily Fresh'].map(pref => (
                                 <div

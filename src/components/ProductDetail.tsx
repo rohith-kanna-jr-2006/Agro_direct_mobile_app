@@ -1,12 +1,13 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ChevronLeft, Leaf, MapPin, ShieldCheck, ShoppingBag, Star, User } from 'lucide-react';
+import { ChevronLeft, Edit, Leaf, MapPin, ShieldCheck, ShoppingBag, Star, Trash, User } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { productAPI } from '../services/api';
-import PaymentModal from './PaymentModal';
+import PaymentModal from './PaymentModal.tsx';
 
 const farmIcon = L.divIcon({
     className: 'custom-farm-icon',
@@ -18,6 +19,7 @@ const farmIcon = L.divIcon({
 });
 
 const ProductDetail: React.FC = () => {
+    const { user } = useAuth();
     const { id } = useParams();
     const navigate = useNavigate();
     const [product, setProduct] = useState<any>(null);
@@ -41,6 +43,20 @@ const ProductDetail: React.FC = () => {
         };
         fetchProduct();
     }, [id, navigate]);
+
+    const isOwner = user && (product?.farmerContact === user.email || product?.farmerName === user.name);
+
+    const handleDelete = async () => {
+        if (window.confirm("Are you sure you want to delete this listing?")) {
+            try {
+                await productAPI.delete(product._id);
+                toast.success("Listing removed successfully");
+                navigate('/farmer-dashboard');
+            } catch (err) {
+                toast.error("Failed to delete listing");
+            }
+        }
+    };
 
     if (loading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="animate-spin" style={{ width: '40px', height: '40px', border: '4px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }}></div></div>;
 
@@ -71,12 +87,12 @@ const ProductDetail: React.FC = () => {
                                 <span style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)' }}>{product.price}</span>
                             </div>
                             <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-                                <span className="badge" style={{ background: 'var(--primary-glow)', color: 'var(--primary)', padding: '0.5rem 1rem', borderRadius: '12px', fontWeight: 700 }}>{product.grade || 'Grade A'}</span>
+                                <span className="badge" style={{ background: 'var(--primary-glow)', color: 'var(--primary)', padding: '0.5rem 1rem', borderRadius: '12px', fontWeight: 700 }}>{product.quality || product.grade || 'Grade A'}</span>
                                 <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', padding: '0.5rem 1rem', borderRadius: '12px' }}>{product.category || 'Vegetables'}</span>
-                                <span className="badge" style={{ background: 'rgba(255,193,7,0.1)', color: '#FFC107', padding: '0.5rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Star size={14} fill="#FFC107" /> 4.8 Rating</span>
+                                <span className="badge" style={{ background: 'rgba(255,193,7,0.1)', color: '#FFC107', padding: '0.5rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Star size={14} fill="#FFC107" /> {product.rating || '5.0'} Rating</span>
                             </div>
                             <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
-                                Freshly harvested from the local farms of {product.farm || 'Madurai'}. This {product.name} is grown using sustainable organic practices, ensuring the highest nutrient content and natural taste. Perfect for daily consumption and bulk orders.
+                                Freshly harvested from the local farms. This {product.name || product.key} is grown using sustainable organic practices, ensuring the highest nutrient content and natural taste. Available quantity: {product.quantity || 'In Stock'}.
                             </p>
                         </div>
                     </div>
@@ -86,25 +102,29 @@ const ProductDetail: React.FC = () => {
                         <div className="premium-card">
                             <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}><User size={22} color="var(--primary)" /> Farmer Profile</h3>
                             <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--border)', overflow: 'hidden' }}>
-                                    <img src={`https://i.pravatar.cc/150?u=${product.farm}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {product.farmerImg ? (
+                                        <img src={product.farmerImg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                        <User size={40} color="var(--text-muted)" />
+                                    )}
                                 </div>
                                 <div>
-                                    <h4 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.2rem' }}>{product.farm || 'Ramesh Kumar'}</h4>
+                                    <h4 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.2rem' }}>{product.farmerName || product.farm || 'Verified Farmer'}</h4>
                                     <p style={{ color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.9rem' }}>
-                                        <ShieldCheck size={16} /> Verified Farmer
+                                        <ShieldCheck size={16} /> Verified Producer
                                     </p>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Experience: 12 Years in Farming</p>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{product.farmerContact || 'Contact Verified'}</p>
                                 </div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                                     <MapPin size={18} color="var(--primary)" />
-                                    <span>{product.dist || '5km'} away from you</span>
+                                    <span>{product.farmerAddress || 'Coimbatore, Tamil Nadu'}</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                                     <Leaf size={18} color="var(--primary)" />
-                                    <span>Sustainable Farming Certificate</span>
+                                    <span>{product.deliveryType === 'FARM_PICKUP' ? 'Farm Pickup Available' : 'Direct Hub Delivery'}</span>
                                 </div>
                             </div>
 
@@ -117,24 +137,45 @@ const ProductDetail: React.FC = () => {
                             </div>
 
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', background: 'var(--background)', padding: '0.8rem', borderRadius: '12px' }}>
-                                    <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>-</button>
-                                    <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>{qty} kg</span>
-                                    <button onClick={() => setQty(q => q + 1)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>+</button>
-                                </div>
-                                <button
-                                    onClick={() => setShowPaymentModal(true)}
-                                    className="btn-primary"
-                                    style={{ flex: 1.5, justifyContent: 'center', height: '54px', fontSize: '1.1rem' }}
-                                >
-                                    <ShoppingBag size={20} /> Buy Now
-                                </button>
+                                {isOwner ? (
+                                    <>
+                                        <button
+                                            onClick={() => navigate('/farmer-dashboard')}
+                                            className="btn-primary"
+                                            style={{ flex: 1, justifyContent: 'center', height: '54px', fontSize: '1.1rem', background: 'var(--surface)', border: '1px solid var(--border)' }}
+                                        >
+                                            <Edit size={20} /> Edit Listing
+                                        </button>
+                                        <button
+                                            onClick={handleDelete}
+                                            className="btn-primary"
+                                            style={{ flex: 1, justifyContent: 'center', height: '54px', fontSize: '1.1rem', background: 'rgba(255,100,100,0.1)', border: '1px solid rgba(255,100,100,0.2)', color: '#ff6b6b' }}
+                                        >
+                                            <Trash size={20} /> Delete
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', background: 'var(--background)', padding: '0.8rem', borderRadius: '12px' }}>
+                                            <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>-</button>
+                                            <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>{qty} {product.quantity?.split(' ')[1] || 'KG'}</span>
+                                            <button onClick={() => setQty(q => q + 1)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>+</button>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowPaymentModal(true)}
+                                            className="btn-primary"
+                                            style={{ flex: 1.5, justifyContent: 'center', height: '54px', fontSize: '1.1rem' }}
+                                        >
+                                            <ShoppingBag size={20} /> Buy Now
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
 
                         <div className="premium-card" style={{ padding: '1.5rem', background: 'var(--primary-glow)' }}>
                             <p style={{ fontSize: '0.9rem', color: 'var(--text)', fontWeight: 600 }}>
-                                🚚 Direct Handover: This product will be delivered directly from the farm to your doorstep within 24 hours of harvest.
+                                🚚 {product.deliveryType === 'MARKET_DROP' ? 'This product is delivered to our central hub for faster last-mile delivery.' : 'Direct Handover: This product will be picked up directly from the farm to ensure maximum freshness.'}
                             </p>
                         </div>
                     </div>

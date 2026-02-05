@@ -22,6 +22,7 @@ import { productAPI } from '../services/api';
 interface AddCropProps {
     onBack: () => void;
     onSuccess: () => void;
+    productToEdit?: any;
 }
 
 const MOCK_CROPS = [
@@ -31,22 +32,23 @@ const MOCK_CROPS = [
     { id: '4', name: 'Rice', image: 'https://img.icons8.com/color/96/rice-bowl.png', marketPrice: 50 },
     { id: '5', name: 'Wheat', image: 'https://img.icons8.com/color/96/wheat.png', marketPrice: 40 },
     { id: '6', name: 'Carrot', image: 'https://img.icons8.com/color/96/carrot.png', marketPrice: 35 },
+    { id: '7', name: 'Egg', image: 'https://img.icons8.com/color/96/egg.png', marketPrice: 8 },
 ];
 
-const AddCrop = ({ onBack, onSuccess }: AddCropProps) => {
+const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
     const { user } = useAuth();
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(productToEdit ? 5 : 1);
     const [loading, setLoading] = useState(false);
 
     // Form State
-    const [crop, setCrop] = useState<any>(null);
-    const [image, setImage] = useState<string | null>(null);
-    const [quality, setQuality] = useState<string | null>(null);
-    const [quantity, setQuantity] = useState('50');
-    const [unit] = useState('kg');
-    const [price, setPrice] = useState('');
-    const [locationText, setLocationText] = useState('');
-    const [deliveryType, setDeliveryType] = useState('FARM_PICKUP'); // FARM_PICKUP or MARKET_DROP
+    const [crop, setCrop] = useState<any>(productToEdit ? MOCK_CROPS.find(c => c.name === productToEdit.name) || { name: productToEdit.name, image: productToEdit.image } : null);
+    const [image, setImage] = useState<string | null>(productToEdit?.image || null);
+    const [quality, setQuality] = useState<string | null>(productToEdit?.quality || null);
+    const [quantity, setQuantity] = useState(productToEdit?.quantity?.split(' ')[0] || '50');
+    const [unit, setUnit] = useState(productToEdit?.quantity?.split(' ')[1] || 'KG');
+    const [price, setPrice] = useState(productToEdit?.price?.replace(/[^0-9]/g, '') || '');
+    const [locationText, setLocationText] = useState(productToEdit?.farmerAddress || '');
+    const [deliveryType, setDeliveryType] = useState(productToEdit?.deliveryType || 'FARM_PICKUP');
 
     // Simulation States
     const [isListening, setIsListening] = useState(false);
@@ -181,30 +183,50 @@ const AddCrop = ({ onBack, onSuccess }: AddCropProps) => {
     // Step 5: Submit
     const handleSubmit = async () => {
         setLoading(true);
+
+        // const village = locationText.split(',')[0] || "Local Village"; // Removed unused variable
+
         const productData = {
             name: crop.name,
             price: `₹${price}/${unit}`,
-            image: image || crop.image,
+            img: image || crop.image, // Map to schema 'img'
+            farm: user?.name || "Ramesh Farm", // Set farm name for buyer view
+            dist: "Local", // Simple default or calculate from location
+            grade: quality?.split(' ')[1] || "A", // Map 'Grade A' to 'A'
+            category: crop.category || "vegetables",
             farmerName: user?.name || "Ramesh Farm",
             farmerContact: user?.email || "+91 98765 43210",
             farmerAddress: locationText || "Coimbatore, TN",
+            userId: user?.email || user?.userId, // Added for reliable filtering
             quality: quality,
             quantity: `${quantity} ${unit}`,
             deliveryType: deliveryType,
             rating: '5.0'
         };
 
+        console.log("Submitting Product Data:", productData);
+        console.log("Current User in AddCrop:", user);
+
         try {
-            await productAPI.create(productData);
-            toast.success("Product is now LIVE!", {
-                icon: '🚀',
-                duration: 4000,
-                style: { background: 'var(--primary)', color: 'white' }
-            });
+            if (productToEdit) {
+                await productAPI.update(productToEdit._id, productData);
+                toast.success("Product Updated!", {
+                    icon: '✅',
+                    duration: 4000,
+                    style: { background: 'var(--primary)', color: 'white' }
+                });
+            } else {
+                await productAPI.create(productData);
+                toast.success("Product is now LIVE!", {
+                    icon: '🚀',
+                    duration: 4000,
+                    style: { background: 'var(--primary)', color: 'white' }
+                });
+            }
             playHapticSound(880, 'sine', 0.5);
             onSuccess();
         } catch (e) {
-            toast.error("Failed to list product");
+            toast.error(productToEdit ? "Failed to update product" : "Failed to list product");
         } finally {
             setLoading(false);
         }
@@ -435,12 +457,29 @@ const AddCrop = ({ onBack, onSuccess }: AddCropProps) => {
                                                 type="number" value={quantity} onChange={e => setQuantity(e.target.value)}
                                                 style={{ width: '100%', background: 'var(--background)', border: '1px solid var(--border)', padding: '1rem', borderRadius: '12px', color: 'white', fontSize: '1.5rem', textAlign: 'center' }}
                                             />
-                                            <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>{unit}</span>
+                                            <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>{unit}</span>
                                         </div>
                                         <button
                                             onClick={() => setQuantity((parseInt(quantity) + 10).toString())}
                                             style={{ width: '50px', height: '50px', borderRadius: '12px', background: 'var(--background)', border: '1px solid var(--border)', color: 'white', cursor: 'pointer' }}
                                         >+</button>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                                        {['KG', '1/2KG', 'Per Item', '100g'].map(u => (
+                                            <button
+                                                key={u}
+                                                onClick={() => setUnit(u)}
+                                                style={{
+                                                    flex: 1, padding: '0.5rem', borderRadius: '8px',
+                                                    background: unit === u ? 'var(--primary)' : 'var(--background)',
+                                                    border: `1px solid ${unit === u ? 'var(--primary)' : 'var(--border)'}`,
+                                                    color: 'white', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                {u}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
 
@@ -460,13 +499,13 @@ const AddCrop = ({ onBack, onSuccess }: AddCropProps) => {
                                 <div className="premium-card" style={{ background: 'rgba(76, 175, 80, 0.05)', border: '1px solid var(--primary)' }}>
                                     <TrendingUp style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Market Index</div>
-                                    <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>₹{crop?.marketPrice} / kg</div>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>₹{crop?.marketPrice} / {unit}</div>
                                     <div style={{ color: 'var(--primary)', fontSize: '0.8rem', marginTop: '0.5rem' }}>Trend: Moderate High</div>
                                 </div>
                                 <div className="premium-card" style={{ background: 'rgba(33, 150, 243, 0.05)', border: '1px solid #2196f3' }}>
                                     <Rocket style={{ color: '#2196f3', marginBottom: '1rem' }} />
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Fast Sell Recommendation</div>
-                                    <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>₹{crop?.marketPrice - 2} / kg</div>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>₹{crop?.marketPrice - 2} / {unit}</div>
                                     <div style={{ color: '#2196f3', fontSize: '0.8rem', marginTop: '0.5rem' }}>High probability of sale within 24h</div>
                                 </div>
                             </div>

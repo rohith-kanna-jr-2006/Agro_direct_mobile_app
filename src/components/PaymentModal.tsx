@@ -47,8 +47,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ product, quantity, onClose 
             const res = await orderAPI.create(orderData);
             setSuccessOrder(res.data);
             toast.success("Order Placed Successfully!");
-        } catch (err) {
-            toast.error("Payment failed. Try again.");
+        } catch (err: any) {
+            const errorMsg = err.response?.data?.message || err.response?.data?.error || "Payment failed. Try again.";
+            toast.error(errorMsg, { duration: 5000 });
         } finally {
             setLoading(false);
         }
@@ -82,7 +83,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ product, quantity, onClose 
                             <div style={{ marginBottom: '2rem' }}>
                                 <p style={{ color: 'var(--text-muted)', marginBottom: '0.8rem' }}>Summary</p>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 700 }}>
-                                    <span>{product.name} x {quantity}kg</span>
+                                    <span>{product.name} x {quantity}{product.quantity?.split(' ')[1] || 'KG'}</span>
                                     <span>₹{total}</span>
                                 </div>
                             </div>

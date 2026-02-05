@@ -7,6 +7,9 @@ const Order = require('./models/Order');
 const Profile = require('./models/Profile');
 const User = require('./models/User');
 const BankDetails = require('./models/BankDetails');
+const FarmerProfile = require('./models/FarmerProfile');
+const BuyerProfile = require('./models/BuyerProfile');
+const DemandRequest = require('./models/DemandRequest');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
@@ -54,6 +57,12 @@ io.on('connection', (socket) => {
 
         // Optional: Save to DB history if orderId is valid
         saveTrackingHistory(data);
+    });
+
+    // 3. Farmer Joins their notification room
+    socket.on('join_farmer_room', (farmerId) => {
+        socket.join(`farmer_${farmerId}`);
+        console.log(`Farmer ${farmerId} joined their notification room.`);
     });
 
     socket.on('disconnect', () => {
@@ -266,7 +275,7 @@ app.post('/api/users/register-phone', async (req, res) => {
         if (role === 'farmer' && farmDetails) {
             bio = `Farms ${farmDetails.acres} acres of ${farmDetails.crops.join(', ')}`;
         } else if (role === 'buyer' && buyerDetails) {
-            bio = `${buyerDetails.subRole === 'business' ? buyerDetails.businessName : 'Consumer'} | Interested in: ${buyerDetails.interests.join(', ')}`;
+            bio = `${(buyerDetails.subRole === 'business' || buyerDetails.subRole === 'hotel') ? buyerDetails.businessName : 'Consumer'} | Interested in: ${buyerDetails.interests.join(', ')}`;
         }
 
         const profileData = {
@@ -625,11 +634,18 @@ app.post('/api/users/toggle-mfa', async (req, res) => {
             return res.status(400).json({ error: "User ID is required" });
         }
 
-        // Find user
-        const user = await User.findById(userId);
+        // Find user robustly (by ID or Email)
+        let user = null;
+        if (require('mongoose').Types.ObjectId.isValid(userId)) {
+            user = await User.findById(userId);
+        } else {
+            user = await User.findOne({ email: userId });
+        }
+
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
+
 
         // Toggle MFA status
         user.isMfaVerified = enable === true;
@@ -718,10 +734,13 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
     try {
+        console.log("Incoming Product Data:", req.body);
         const newProduct = new Product(req.body);
         const savedProduct = await newProduct.save();
+        console.log("Saved Product ID:", savedProduct._id);
         res.status(201).json(savedProduct);
     } catch (err) {
+        console.error("Product Creation Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -744,6 +763,21 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
+// Bulk Delete
+app.delete('/api/products', async (req, res) => {
+    try {
+        const { farmer } = req.query;
+        let query = {};
+        if (farmer) {
+            query = { $or: [{ farmerName: farmer }, { farmerContact: farmer }] };
+        }
+        const result = await Product.deleteMany(query);
+        res.json({ message: `${result.deletedCount} products deleted`, count: result.deletedCount });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Orders ---
 app.get('/api/orders', async (req, res) => {
     try {
@@ -756,33 +790,115 @@ app.get('/api/orders', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
     try {
-        // Generate unique Tracking ID KD-XXXX
+        const { productId, quantity, farmer, productName, userName, userUsername, userId } = req.body;
+        const orderQty = parseInt(quantity) || 1;
+
+        // 1. Stock Validation
+        if (productId) {
+            const product = await Product.findById(productId);
+            if (product && product.quantity) {
+                const currentQty = parseInt(product.quantity);
+                const unit = product.quantity.split(' ')[1] || 'KG';
+
+                if (orderQty > currentQty) {
+                    // Notify Farmer of Unmet Demand
+                    const farmerChannel = `farmer_${farmer?.id || farmer?.name}`;
+
+                    // Save Demand Request
+                    const demand = new DemandRequest({
+                        productId,
+                        productName,
+                        requestedQty: orderQty,
+                        availableQty: currentQty,
+                        buyer: { id: userId, name: userName, username: userUsername },
+                        farmer: { id: farmer?.id, name: farmer?.name }
+                    });
+                    await demand.save();
+
+                    io.to(farmerChannel).emit('notification', {
+                        title: '🔥 High Demand Alert!',
+                        message: `${userName} wanted ${orderQty}${unit} of ${productName}, but you only have ${currentQty}${unit}!`,
+                        type: 'warning',
+                        priority: 'high'
+                    });
+
+                    return res.status(400).json({
+                        error: "Insufficient Stock",
+                        message: `Only ${currentQty}${unit} available. Your request for ${orderQty}${unit} cannot be fulfilled.`
+                    });
+                }
+
+                // Deduct Stock
+                const newQty = currentQty - orderQty;
+                product.quantity = `${newQty} ${unit}`;
+                await product.save();
+
+                // Notify low stock if needed
+                const farmerChannel = `farmer_${farmer?.id || farmer?.name}`;
+                if (newQty === 0) {
+                    io.to(farmerChannel).emit('notification', {
+                        title: 'Stock Empty! ⚠️',
+                        message: `Your listing for ${productName} is now out of stock.`,
+                        type: 'error'
+                    });
+                } else if (newQty < 10) {
+                    io.to(farmerChannel).emit('notification', {
+                        title: 'Low Stock Alert!',
+                        message: `Only ${newQty}${unit} left for ${productName}.`,
+                        type: 'warning'
+                    });
+                }
+            }
+        }
+
+        // 2. Create Order
         const trackingId = `KD-${Math.floor(1000 + Math.random() * 9000)}`;
-
-        const orderData = {
-            ...req.body,
-            trackingId,
-            status: 'Placed'
-        };
-
+        const orderData = { ...req.body, trackingId, status: 'Placed' };
         const newOrder = new Order(orderData);
         const savedOrder = await newOrder.save();
 
-        // --- AUTO AMOUNT FIX (Wallet Credit) ---
-        if (req.body.farmer && req.body.farmer.name) {
-            const farmerName = req.body.farmer.name;
+        // 3. Wallet Credit & Analytics
+        if (farmer && (farmer.id || farmer.name)) {
             const amount = req.body.totalPrice || 0;
+            const filter = farmer.id ? { $or: [{ 'user.email': farmer.id }, { 'user.mobileNumber': farmer.id }, { name: farmer.name }] } : { name: farmer.name };
+
+            await FarmerProfile.findOneAndUpdate(
+                filter,
+                { $inc: { walletBalance: amount, 'analytics.totalSales': 1, 'analytics.totalRevenue': amount } }
+            );
 
             await Profile.findOneAndUpdate(
-                { name: farmerName, role: 'farmer' },
+                { name: farmer.name, role: 'farmer' },
                 { $inc: { walletBalance: amount } }
             );
-            console.log(`Credited ₹${amount} to farmer: ${farmerName}`);
         }
+
+        // Notify Order Success
+        const farmerChannel = `farmer_${farmer?.id || farmer?.name}`;
+        io.to(farmerChannel).emit('notification', {
+            title: 'Order Confirmed! 📦',
+            message: `New order for ${productName} (${orderQty}kg).`,
+            type: 'success'
+        });
 
         res.status(201).json(savedOrder);
     } catch (err) {
         console.error("Order Creation Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Demand Requests (High Demand Details) ---
+app.get('/api/demand-requests', async (req, res) => {
+    try {
+        const { farmer } = req.query;
+        let query = {};
+        if (farmer) {
+            query = { $or: [{ 'farmer.id': farmer }, { 'farmer.name': farmer }] };
+        }
+        const requests = await DemandRequest.find(query).sort({ createdAt: -1 });
+        res.json(requests);
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
@@ -812,8 +928,6 @@ app.post('/api/orders/:id/rate', async (req, res) => {
 });
 
 // --- Profile ---
-const FarmerProfile = require('./models/FarmerProfile');
-const BuyerProfile = require('./models/BuyerProfile');
 
 // --- Profile ---
 app.get('/api/profile/:userId/:role', async (req, res) => {
@@ -976,7 +1090,13 @@ app.post('/api/profile', async (req, res) => {
 
 app.get('/api/analytics', async (req, res) => {
     try {
-        const orders = await Order.find();
+        const { farmer } = req.query;
+        let query = {};
+        if (farmer) {
+            query = { $or: [{ 'farmer.id': farmer }, { 'farmer.name': farmer }] };
+        }
+
+        const orders = await Order.find(query);
 
         const totalRevenue = orders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
         const totalSales = orders.length;
