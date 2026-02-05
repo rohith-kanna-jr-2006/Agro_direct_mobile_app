@@ -61,7 +61,9 @@
         "name_placeholder": "Name",
         "email_placeholder": "Email",
         "password_placeholder": "Password",
-        "phone_placeholder": "Phone Number"
+        "phone_placeholder": "Phone Number",
+        "login_sub": "Login to your account",
+        "signup_sub": "Register for a new account"
     },
     "footer": {
         "tagline": "Built for the future of farming.",

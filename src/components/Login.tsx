@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import LoginButton from './LoginButton';
+
 
 const Login = () => {
     const { role, setRole, login, traditionalLogin, register, verifyMfa } = useAuth();
@@ -179,39 +179,69 @@ const Login = () => {
         <div className="login-split">
             {/* Left Side: Branding */}
             <div className="login-branding">
-                <img
-                    src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=1200"
-                    alt="Agriculture"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+                <div className="branding-image-container">
+                    <img
+                        src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=1200"
+                        alt="Agriculture"
+                        className="branding-bg"
+                    />
+                    <div className="branding-glass-overlay" />
+                </div>
+
                 <div className="brand-overlay">
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}
+                        transition={{ duration: 0.6 }}
+                        className="brand-logo-section"
                     >
-                        <div style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '16px', backdropFilter: 'blur(10px)' }}>
-                            <img src="/img/farmdirect-logo.jpeg" alt="FarmDirect Logo" style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }} />
+                        <div className="brand-logo-wrapper">
+                            <img src="/img/farmdirect-logo.jpeg" alt="FarmDirect Logo" className="brand-logo-img" />
                         </div>
                         <h1 className="brand-text-large">FarmDirect</h1>
                     </motion.div>
-                    <motion.h2
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                        style={{ fontSize: '2.5rem', fontWeight: 600, maxWidth: '600px', lineHeight: 1.2, color: 'rgba(255,255,255,0.9)' }}
-                    >
-                        {t('hero.title')}
-                    </motion.h2>
-                    <motion.p
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
-                        style={{ fontSize: '1.2rem', marginTop: '1.5rem', color: 'rgba(255,255,255,0.7)', maxWidth: '500px' }}
-                    >
-                        Join thousands of farmers and buyers in the most transparent agricultural marketplace.
-                    </motion.p>
+
+                    <div className="branding-content">
+                        <motion.h2
+                            initial={{ opacity: 0, x: -30 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.3, duration: 0.6 }}
+                            className="branding-title"
+                        >
+                            {t('hero.title')}
+                        </motion.h2>
+
+                        <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.5, duration: 0.8 }}
+                            className="branding-description"
+                        >
+                            Connect directly with producers, ensure fair prices, and experience the future of agricultural commerce.
+                        </motion.p>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.7 }}
+                            className="branding-stats"
+                        >
+                            <div className="stat-item">
+                                <span className="stat-value">50k+</span>
+                                <span className="stat-label">Farmers</span>
+                            </div>
+                            <div className="stat-divider" />
+                            <div className="stat-item">
+                                <span className="stat-value">120+</span>
+                                <span className="stat-label">Crops</span>
+                            </div>
+                            <div className="stat-divider" />
+                            <div className="stat-item">
+                                <span className="stat-value">Direct</span>
+                                <span className="stat-label">Market</span>
+                            </div>
+                        </motion.div>
+                    </div>
                 </div>
             </div>
 
@@ -230,18 +260,16 @@ const Login = () => {
                                 {/* Home Button */}
                                 <button
                                     onClick={() => navigate('/')}
-                                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '2rem', padding: 0, fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.2s' }}
-                                    onMouseOver={(e) => e.currentTarget.style.color = 'var(--primary)'}
-                                    onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                                    className="back-to-home"
                                 >
                                     <Home size={16} /> Back to Home
                                 </button>
 
-                                <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-                                    <h2 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                                <div className="login-header">
+                                    <h2 className="login-title">
                                         {isSignup ? t('login.create_account') : t('login.welcome_back')}
                                     </h2>
-                                    <p style={{ color: 'var(--text-muted)' }}>{t('login.select_role')}</p>
+                                    <p className="login-subtitle">{t('login.select_role')}</p>
                                 </div>
 
                                 <div className="role-grid">
@@ -277,22 +305,22 @@ const Login = () => {
                             >
                                 {showMfa ? (
                                     <div className="mfa-flow">
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+                                        <div className="auth-step-header">
                                             <button
                                                 onClick={() => setShowMfa(false)}
-                                                style={{ background: 'rgba(255, 255, 255, 0.05)', border: 'none', color: 'white', padding: '8px', borderRadius: '50%', cursor: 'pointer', display: 'flex' }}
+                                                className="back-icon-btn"
                                             >
-                                                <ArrowLeft size={18} />
+                                                <ArrowLeft size={20} />
                                             </button>
-                                            <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>MFA Verification</h2>
+                                            <h2 className="auth-step-title">MFA Verification</h2>
                                         </div>
 
-                                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                                            Select factor for verification: <strong>{mfaIdentifier}</strong>.
-                                            Enter the 6-digit code sent.
+                                        <p className="auth-step-subtitle">
+                                            Verification required for <strong>{mfaIdentifier}</strong>.
+                                            Please enter the 6-digit code sent to your device.
                                         </p>
 
-                                        <form onSubmit={handleMfaSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                        <form onSubmit={handleMfaSubmit} className="auth-form">
                                             <div className="input-group">
                                                 <div className="premium-input-wrapper">
                                                     <Lock className="input-icon" size={20} />
@@ -313,32 +341,32 @@ const Login = () => {
                                                 type="submit"
                                                 disabled={isSubmitting}
                                                 className="btn-primary"
-                                                style={{ justifyContent: 'center', padding: '1rem', width: '100%' }}
+                                                style={{ justifyContent: 'center', padding: '1rem', width: '100%', marginTop: '0.5rem' }}
                                             >
                                                 {isSubmitting ? 'Verifying...' : 'Verify & Login'}
                                             </button>
                                         </form>
 
-                                        <p style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                            Didn't receive code? <button type="button" style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}>Resend</button>
+                                        <p className="auth-footer-text">
+                                            Didn't receive code? <button type="button" className="text-btn">Resend</button>
                                         </p>
                                     </div>
                                 ) : (
                                     <>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '2.5rem' }}>
+                                        <div className="auth-step-header">
                                             <button
                                                 onClick={() => setStep(0)}
-                                                style={{ background: 'rgba(255, 255, 255, 0.05)', border: 'none', color: 'white', padding: '8px', borderRadius: '50%', cursor: 'pointer', display: 'flex' }}
+                                                className="back-icon-btn"
                                             >
-                                                <ArrowLeft size={18} />
+                                                <ArrowLeft size={20} />
                                             </button>
-                                            <h2 style={{ fontSize: '2rem', fontWeight: 800 }}>
+                                            <h2 className="auth-step-title">
                                                 {isSignup ? t('login.create_account') : t('login.login_btn')}
                                             </h2>
                                         </div>
 
-                                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                                            {isSignup ? t('login.signup_sub') : t('login.login_sub')} as <span style={{ color: 'var(--primary)', fontWeight: 700, textTransform: 'capitalize' }}>{role}</span>
+                                        <p className="auth-step-subtitle">
+                                            {isSignup ? t('login.signup_sub') : t('login.login_sub')} as <span className="highlight-text">{role}</span>
                                         </p>
 
                                         <form onSubmit={handleTraditionalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -479,25 +507,10 @@ const Login = () => {
                                         </div>
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
                                             <button
                                                 type="button"
                                                 onClick={() => googleLogin()}
-                                                className="premium-input"
-                                                style={{
-                                                    width: '100%',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    gap: '12px',
-                                                    cursor: 'pointer',
-                                                    fontWeight: 600,
-                                                    background: 'white',
-                                                    color: 'black',
-                                                    marginTop: '0.5rem',
-                                                    border: 'none',
-                                                    padding: '12px'
-                                                }}
+                                                className="google-login-btn"
                                             >
                                                 <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                                                     <g transform="matrix(1, 0, 0, 1, 27.009001, -39.23856)">
@@ -509,7 +522,6 @@ const Login = () => {
                                                 </svg>
                                                 Continue with Google
                                             </button>
-                                            <LoginButton role={role} />
                                         </div>
                                     </>
                                 )}

@@ -1,5 +1,7 @@
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { productAPI } from '../services/api';
 
 const MarketplacePreview = () => {
     const navigate = useNavigate();
@@ -17,12 +19,25 @@ const MarketplacePreview = () => {
         navigate('/login?role=buyer');
     };
 
-    const products = [
-        { key: 'tomato', price: '₹40/kg', image: 'https://images.unsplash.com/photo-1546473427-e1ad6d66be85?auto=format&fit=crop&q=80&w=400', grade: 'Grade A' },
-        { key: 'potato', price: '₹25/kg', image: 'https://images.unsplash.com/photo-1518977676601-b53f02bad67b?auto=format&fit=crop&q=80&w=400', grade: 'Grade A+' },
-        { key: 'corn', price: '₹30/kg', image: 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&q=80&w=400', grade: 'Grade B+' },
-        { key: 'paddy', price: '₹55/kg', image: 'https://images.unsplash.com/photo-1586201327693-866199f121df?auto=format&fit=crop&q=80&w=400', grade: 'Grade A' }
-    ];
+    const [products, setProducts] = React.useState<any[]>([]);
+    const [loading, setLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const res = await productAPI.getAll();
+                // Show only first 4 for preview
+                setProducts(res.data.slice(0, 4));
+            } catch (err) {
+                console.error("Failed to fetch preview products", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchProducts();
+    }, []);
+
+    if (loading) return null;
 
     return (
         <section style={{ padding: '100px 0', background: 'rgba(255,255,255,0.02)' }}>
@@ -43,13 +58,13 @@ const MarketplacePreview = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
                     {products.map((item, i) => (
                         <div key={i} className="premium-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <img src={item.image} alt={t(`marketplace.products.${item.key}`)} style={{ width: '100%', height: '200px', objectFit: 'cover' }} />
+                            <img src={item.img || item.image} alt={item.name} style={{ width: '100%', height: '230px', objectFit: 'cover' }} />
                             <div style={{ padding: '1.5rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                                     <span style={{ background: 'var(--primary)', color: 'white', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '4px', fontWeight: 700 }}>{item.grade}</span>
                                     <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{item.price}</span>
                                 </div>
-                                <h4 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>{t(`marketplace.products.${item.key}`)}</h4>
+                                <h4 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>{item.name}</h4>
                                 <button
                                     onClick={handleAddToCart}
                                     className="btn-primary"

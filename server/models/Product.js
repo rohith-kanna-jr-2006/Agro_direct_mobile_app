@@ -3,9 +3,11 @@ const mongoose = require('mongoose');
 const productSchema = new mongoose.Schema({
   name: String,
   price: String,
-  // keeping price as String because current app uses formatted strings like "₹50/kg"
-  // Ideally should be split into value and unit, but respecting current app logic for now.
-  image: String,
+  img: String, // UI uses 'img'
+  farm: String, // UI uses 'farm'
+  dist: String, // UI uses 'dist'
+  grade: String, // UI uses 'grade'
+  category: String, // UI uses 'category'
   farmerName: String,
   farmerContact: String,
   farmerAddress: String,
