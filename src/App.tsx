@@ -17,7 +17,9 @@ import Hero from './components/Hero';
 import Login from './components/Login';
 import MarketplacePreview from './components/MarketplacePreview';
 import Onboarding from './components/Onboarding';
+import ProductDetail from './components/ProductDetail';
 import Settings from './components/Settings';
+import TrackOrder from './components/TrackOrder';
 
 // --- Helper Components ---
 const ScrollToTop = () => {
@@ -100,7 +102,6 @@ const LandingPage = () => {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ background: '#4CAF50', color: 'white', fontSize: '10px', textAlign: 'center', padding: '2px' }}>v1.0.6 - Debugging Navigation</div>
       <Header />
       <main style={{ flex: 1 }}>
         <Hero />
@@ -169,6 +170,18 @@ const App = () => {
           <Route path="/settings" element={
             <ProtectedRoute>
               <AppLayout><Settings /></AppLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/product/:id" element={
+            <ProtectedRoute requiredRole="buyer">
+              <AppLayout><ProductDetail /></AppLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/track-order" element={
+            <ProtectedRoute requiredRole="buyer">
+              <AppLayout><TrackOrder /></AppLayout>
             </ProtectedRoute>
           } />
 

@@ -756,11 +756,19 @@ app.get('/api/orders', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
     try {
-        const newOrder = new Order(req.body);
+        // Generate unique Tracking ID KD-XXXX
+        const trackingId = `KD-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        const orderData = {
+            ...req.body,
+            trackingId,
+            status: 'Placed'
+        };
+
+        const newOrder = new Order(orderData);
         const savedOrder = await newOrder.save();
 
         // --- AUTO AMOUNT FIX (Wallet Credit) ---
-        // Find the farmer by name (assuming unique names for simplicity, or use ID if available)
         if (req.body.farmer && req.body.farmer.name) {
             const farmerName = req.body.farmer.name;
             const amount = req.body.totalPrice || 0;
@@ -773,6 +781,21 @@ app.post('/api/orders', async (req, res) => {
         }
 
         res.status(201).json(savedOrder);
+    } catch (err) {
+        console.error("Order Creation Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// API: Track Order by Tracking ID
+app.get('/api/orders/track/:trackingId', async (req, res) => {
+    try {
+        const { trackingId } = req.params;
+        const order = await Order.findOne({ trackingId });
+        if (!order) {
+            return res.status(404).json({ error: "Order not found" });
+        }
+        res.json(order);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

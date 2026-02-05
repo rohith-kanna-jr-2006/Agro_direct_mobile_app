@@ -47,6 +47,7 @@ export const bankAPI = {
 export const orderAPI = {
     getAll: () => api.get('/orders'),
     create: (orderData: any) => api.post('/orders', orderData),
+    trackByTrackingId: (trackingId: string) => api.get(`/orders/track/${trackingId}`),
     rate: (id: string, rating: number) => api.post(`/orders/${id}/rate`, { rating }),
 };
 
