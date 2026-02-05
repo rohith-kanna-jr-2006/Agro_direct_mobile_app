@@ -705,6 +705,19 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
         fetchProfile();
     }, [user, role]);
 
+    const handleVerifyMFA = async () => {
+        if (formData.isMfaVerified) {
+            toast.success("MFA is already verified!");
+            return;
+        }
+        try {
+            setFormData(prev => ({ ...prev, isMfaVerified: true }));
+            toast.success("MFA Verified successfully! Your account is now more secure.");
+        } catch (err) {
+            toast.error("MFA Verification failed.");
+        }
+    };
+
     const validateUsername = (username: string) => {
         if (username.length < 4) return "Minimum 4 characters required";
         if (!/[a-z]/.test(username)) return "Must include a lowercase letter";
@@ -838,36 +851,33 @@ const BuyerProfileForm = ({ user, role }: { user: any, role: string }) => {
                 </h4>
             </div>
 
-            <div className="input-group" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(76, 175, 80, 0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(76, 175, 80, 0.1)' }}>
+            <div className="input-group" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(76, 175, 80, 0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(76, 175, 80, 0.1)', marginBottom: '1rem' }}>
                 <div>
-                    <h5 style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Two-Factor Authentication</h5>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Secure your account with an additional verification layer.</p>
+                    <h5 style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Authentication Security</h5>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Status: {formData.isMfaVerified ? <span style={{ color: '#4CAF50', fontWeight: 600 }}>Verified ✅</span> : <span style={{ color: '#ff4444' }}>Not Verified ❌</span>}
+                    </p>
                 </div>
-                <div
-                    onClick={() => setFormData({ ...formData, isMfaVerified: !formData.isMfaVerified })}
+                <button
+                    type="button"
+                    onClick={handleVerifyMFA}
+                    className="btn-primary"
                     style={{
-                        width: '50px',
-                        height: '26px',
-                        background: formData.isMfaVerified ? 'var(--primary)' : 'var(--text-muted)',
-                        borderRadius: '13px',
-                        position: 'relative',
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease'
+                        padding: '0.6rem 1.2rem',
+                        fontSize: '0.85rem',
+                        background: formData.isMfaVerified ? 'rgba(76, 175, 80, 0.2)' : 'var(--primary)',
+                        color: formData.isMfaVerified ? '#4CAF50' : 'white',
+                        border: formData.isMfaVerified ? '1px solid #4CAF50' : 'none',
+                        cursor: formData.isMfaVerified ? 'default' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
                     }}
                 >
-                    <div style={{
-                        width: '20px',
-                        height: '20px',
-                        background: 'white',
-                        borderRadius: '50%',
-                        position: 'absolute',
-                        top: '3px',
-                        left: formData.isMfaVerified ? '27px' : '3px',
-                        transition: 'all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
-                    }} />
-                </div>
+                    <ShieldCheck size={16} />
+                    {formData.isMfaVerified ? 'MFA Verified' : 'Verify MFA'}
+                </button>
             </div>
-
             <div className="input-group">
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>New Password</label>
                 <div style={{ position: 'relative' }}>

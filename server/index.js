@@ -310,18 +310,22 @@ app.post('/api/users/register', async (req, res) => {
             });
         }
 
+        // Hash password before saving
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
         // Condition 2: If Email does NOT exist -> Create User
         const newUser = new User({
             name,
             email,
-            password,
+            password: hashedPassword,
             mobileNumber: phone || '0000000000', // Default if not provided
             username: username || email,
             location: location || '',
             role: role || 'farmer',
             isOnboarded: false,
             isProfileComplete: false,
-            isMfaVerified: false,
+            isMfaVerified: true,
             createdAt: new Date()
         });
 
@@ -371,7 +375,16 @@ app.post('/api/users/login', async (req, res) => {
         }
 
         // Verification
-        if (user.password !== password) {
+        let isPasswordValid = false;
+        if (user.password && user.password.startsWith('$2')) {
+            // Password is hashed, use bcrypt compare
+            isPasswordValid = await bcrypt.compare(password, user.password);
+        } else {
+            // Password is plain text (legacy or placeholder), direct comparison
+            isPasswordValid = user.password === password;
+        }
+
+        if (!isPasswordValid) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
@@ -385,25 +398,12 @@ app.post('/api/users/login', async (req, res) => {
             console.log(`[AUTH_DEBUG] Role switch saved successfully.`);
         }
 
-        // Condition: If Valid -> Check MFA
+        // MFA enforcement removed as per user request to remove 2FA option
+        /*
         if (user.isMfaVerified) {
-            // Generate MFA OTP
-            const mfaOtp = Math.floor(100000 + Math.random() * 900000).toString();
-            const identifier = user.mobileNumber || user.email;
-            otpStore[identifier] = mfaOtp;
-
-            console.log(`[MFA_AUTH] Generated OTP for ${user.email} (${identifier}): ${mfaOtp}`);
-
-            return res.json({
-                success: true,
-                requiresMFA: true,
-                message: "MFA verification required",
-                mfaIdentifier: identifier,
-                userId: user._id,
-                email: user.email,
-                role: user.role
-            });
+            ...
         }
+        */
 
         // Condition: If Valid & No MFA -> Generate Token
         const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
@@ -455,25 +455,12 @@ app.post('/api/users/google-login', async (req, res) => {
                 await user.save();
             }
 
-            // Condition: If Valid -> Check MFA
+            // MFA enforcement removed for Google Login as well
+            /*
             if (user.isMfaVerified) {
-                // Generate MFA OTP
-                const mfaOtp = Math.floor(100000 + Math.random() * 900000).toString();
-                const identifier = user.mobileNumber || user.email;
-                otpStore[identifier] = mfaOtp;
-
-                console.log(`[MFA_GOOGLE] Generated OTP for ${user.email} (${identifier}): ${mfaOtp}`);
-
-                return res.json({
-                    success: true,
-                    requiresMFA: true,
-                    message: "MFA verification required",
-                    mfaIdentifier: identifier,
-                    userId: user._id,
-                    email: user.email,
-                    role: user.role
-                });
+                ...
             }
+            */
 
             // Generate Token
             const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
@@ -503,6 +490,7 @@ app.post('/api/users/google-login', async (req, res) => {
                 password: `google_${googleId}`, // Generate a safe placeholder
                 phone: '0000000000',
                 role: role || 'farmer',
+                isMfaVerified: true,
                 createdAt: new Date()
             });
 
@@ -584,9 +572,9 @@ app.post('/api/users/update-password', async (req, res) => {
         }
 
         // Verify current password
-        // Check if password is hashed (starts with $2b$ for bcrypt)
+        // Check if password is hashed (starts with $2 for bcrypt)
         let isPasswordValid = false;
-        if (user.password.startsWith('$2b$')) {
+        if (user.password.startsWith('$2')) {
             // Password is hashed, use bcrypt compare
             isPasswordValid = await bcrypt.compare(currentPassword, user.password);
         } else {
@@ -888,6 +876,7 @@ app.post('/api/profile', async (req, res) => {
         if (reqUsername) userUpdateData.username = reqUsername;
         if (req.body.phone) userUpdateData.mobileNumber = req.body.phone;
         if (req.body.isMfaVerified !== undefined) userUpdateData.isMfaVerified = req.body.isMfaVerified;
+        else if (!user.isOnboarded) userUpdateData.isMfaVerified = true; // Set to true automatically on first profile setup
 
         // Location string handling
         if (req.body.location && typeof req.body.location === 'string') {
