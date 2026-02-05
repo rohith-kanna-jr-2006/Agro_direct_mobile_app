@@ -28,6 +28,7 @@ export const productAPI = {
     create: (productData: any) => api.post('/products', productData),
     update: (id: string, productData: any) => api.put(`/products/${id}`, productData),
     delete: (id: string) => api.delete(`/products/${id}`),
+    deleteAll: (farmer?: string) => api.delete('/products', { params: { farmer } }),
 };
 
 export const profileAPI = {
@@ -49,6 +50,7 @@ export const orderAPI = {
     create: (orderData: any) => api.post('/orders', orderData),
     trackByTrackingId: (trackingId: string) => api.get(`/orders/track/${trackingId}`),
     rate: (id: string, rating: number) => api.post(`/orders/${id}/rate`, { rating }),
+    getDemandRequests: (params?: any) => api.get('/demand-requests', { params }),
 };
 
 export default api;

@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Components
 import BuyerDashboard from './components/BuyerDashboard';
+import FarmerChat from './components/FarmerChat';
 import FarmerCTA from './components/FarmerCTA';
 import FarmerDashboard from './components/FarmerDashboard';
 import Footer from './components/Footer';
@@ -20,6 +21,7 @@ import Onboarding from './components/Onboarding';
 import ProductDetail from './components/ProductDetail';
 import Settings from './components/Settings';
 import TrackOrder from './components/TrackOrder';
+
 
 // --- Helper Components ---
 const ScrollToTop = () => {
@@ -84,7 +86,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => (
 );
 
 const LandingPage = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   if (user) {
     if (!user.isOnboarded) return <Navigate to="/onboarding" />;
@@ -94,22 +96,11 @@ const LandingPage = () => {
     return <Navigate to="/onboarding" />;
   }
 
-  const handleReset = () => {
-    localStorage.clear();
-    logout();
-    window.location.reload();
-  };
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header />
       <main style={{ flex: 1 }}>
         <Hero />
-        <div className="container" style={{ textAlign: 'center', padding: '2rem' }}>
-          <button onClick={handleReset} style={{ background: 'rgba(255,100,100,0.1)', border: '1px solid rgba(255,100,100,0.2)', color: '#ff6b6b', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer' }}>
-            Clear Session
-          </button>
-        </div>
         <MarketplacePreview />
         <FarmerCTA />
       </main>
@@ -184,6 +175,13 @@ const App = () => {
               <AppLayout><TrackOrder /></AppLayout>
             </ProtectedRoute>
           } />
+
+          <Route path="/farmer-chat" element={
+            <ProtectedRoute requiredRole="farmer">
+              <FarmerChat />
+            </ProtectedRoute>
+          } />
+
 
           {/* Fallback */}
           <Route path="*" element={<FallbackRedirect />} />

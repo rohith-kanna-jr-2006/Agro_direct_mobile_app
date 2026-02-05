@@ -468,7 +468,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 } else if (backendRole === 'buyer') {
                     profileData.shopName = details.businessName;
                     profileData.preferences = details.preferences;
-                    profileData.type = details.businessName ? 'retailer' : 'household';
+                    profileData.type = details.buyerType || (details.businessName ? 'retailer' : 'household');
                 }
 
                 await profileAPI.update(profileData);

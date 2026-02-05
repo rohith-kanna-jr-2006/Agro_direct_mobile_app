@@ -15,6 +15,11 @@ const farmerProfileSchema = new mongoose.Schema({
             ifsc: { type: String }
             // Note: Bank details should be encrypted before storage in a real production environment
         }
+    },
+    walletBalance: { type: Number, default: 0 },
+    analytics: {
+        totalSales: { type: Number, default: 0 },
+        totalRevenue: { type: Number, default: 0 }
     }
 }, { timestamps: true });
 
