@@ -5,6 +5,7 @@
 
 export interface ChatContext {
     farmerName?: string;
+    buyerName?: string;
     location?: string;
     listings?: any[];
     analytics?: any;
@@ -16,6 +17,77 @@ export interface AnalysisResult {
     recommendation: string;
     confidence: string;
 }
+
+export const fetchBuyerAIResponse = async (
+    userMessage: string,
+    language: string = 'en',
+    context: ChatContext = {}
+): Promise<string> => {
+    // Simulate network & "thinking" delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const msg = userMessage.toLowerCase();
+    const { listings = [], orders = [], buyerName = 'Buyer', location = 'your area' } = context;
+
+    // --- BUYER ANALYSIS LOGIC ---
+
+    // 1. Order History
+    if (msg.includes("my orders") || msg.includes("previous purchases") || msg.includes("history")) {
+        if (orders.length === 0) {
+            return language === 'hi'
+                ? "मुझे आपके कोई पिछले ऑर्डर नहीं मिले। क्या आप आज खरीदारी शुरू करना चाहेंगे?"
+                : "I couldn't find any previous orders for you. Would you like to start shopping today?";
+        }
+
+        const lastOrder = orders[0];
+        return language === 'hi'
+            ? `आपका पिछला ऑर्डर ${lastOrder.productName} था, जिसकी कीमत ₹${lastOrder.totalPrice} थी। आप इसे अपनी 'माय ऑर्डर्स' टैब में देख सकते हैं।`
+            : `Your last order was ${lastOrder.productName} for ₹${lastOrder.totalPrice}. You can track it in your 'My Orders' tab.`;
+    }
+
+    // 2. Recommendations / What to buy
+    if (msg.includes("recommend") || msg.includes("suggest") || msg.includes("what should i buy") || msg.includes("popular")) {
+        if (listings.length === 0) {
+            return "I'm checking the fresh arrivals... Currently, Organic Tomatoes and Basmati Rice are trending in your area.";
+        }
+        const topProduct = listings[0];
+        return language === 'hi'
+            ? `मैं आज ${topProduct.name || topProduct.key} की सलाह देता हूं। यह ${topProduct.farm} से ताजा आया है!`
+            : `I recommend checking out ${topProduct.name || topProduct.key} today. It's fresh from ${topProduct.farm || 'a local farm'} and very popular!`;
+    }
+
+    // 3. Price Checks
+    if (msg.includes("price") || msg.includes("cost") || msg.includes("rate")) {
+        let product = "Tomato";
+        if (msg.includes("rice")) product = "Rice";
+        if (msg.includes("onion")) product = "Onion";
+        if (msg.includes("potato")) product = "Potato";
+
+        const price = 20 + Math.floor(Math.random() * 60);
+        return language === 'hi'
+            ? `वर्तमान में ${product} की औसत कीमत ₹${price}/kg है। हमारे पास कुछ बेहतरीन विकल्प उपलब्ध हैं!`
+            : `The current average price for ${product} is ₹${price}/kg. We have some great local listings available!`;
+    }
+
+    // 4. Delivery / Tracking
+    if (msg.includes("track") || msg.includes("delivery") || msg.includes("where is my order")) {
+        return language === 'hi'
+            ? "आप अपने सक्रिय ऑर्डर्स को 'ट्रैक लाइव' बटन पर क्लिक करके देख सकते हैं। हमारे पार्टनर किसान सीधे आपके पते पर डिलीवरी कर रहे हैं।"
+            : "You can track your active orders by clicking 'Track Live' in your orders tab. Our farmer partners deliver directly to your doorstep.";
+    }
+
+    // 5. Help / General
+    if (msg.includes("help") || msg.includes("how") || msg.includes("what can you do")) {
+        return language === 'hi'
+            ? "मैं आदेशों को ट्रैक करने, नई उपज खोजने और सर्वोत्तम कीमतों का विश्लेषण करने में आपकी मदद कर सकता हूँ। बस मुझसे पूछें!"
+            : "I can help you track orders, find fresh produce, and analyze the best prices. Just ask me!";
+    }
+
+    // Default "Smart Response"
+    return language === 'hi'
+        ? `नमस्ते ${buyerName}, मैं आपकी खरीदारी में कैसे मदद कर सकता हूँ? आज ${location} क्षेत्र में ताजी सब्जियां और अनाज उपलब्ध हैं।`
+        : `Hello ${buyerName}, how can I assist with your shopping today? We have fresh vegetables and grains available near ${location} right now.`;
+};
 
 export const fetchAIResponse = async (
     userMessage: string,
