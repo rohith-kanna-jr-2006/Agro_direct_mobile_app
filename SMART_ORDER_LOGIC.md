@@ -13,7 +13,7 @@ When the user enters text, the backend (or local logic) analyzes it to extract t
   "entities": {
     "location_entity": {
       "value": "Madurai", 
-      "detected": true 
+      "detected": true  
     },
     "product_entity": {
       "value": "Tomato", 

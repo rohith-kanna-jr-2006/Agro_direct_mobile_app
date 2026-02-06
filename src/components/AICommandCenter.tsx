@@ -1,4 +1,4 @@
-import { Bot, CheckCircle2, RotateCcw, Send } from 'lucide-react';
+import { CheckCircle2, Cpu, RotateCcw, Send } from 'lucide-react';
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -64,7 +64,7 @@ const AICommandCenter: React.FC = () => {
             {/* AI Hub Header */}
             <div className="flex items-center gap-3 mb-6">
                 <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
-                    <Bot size={28} />
+                    <Cpu size={24} />
                 </div>
                 <div>
                     <h2 className="text-2xl font-black text-gray-800 tracking-tight">AI Command Center</h2>

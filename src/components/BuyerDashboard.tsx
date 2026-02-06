@@ -1,4 +1,4 @@
-import { Calendar, Download, Eye, EyeOff, FileText, Filter, Leaf, Mail, MapPin, Mic, Minus, Phone, Plus, Printer, Search as SearchIcon, ShieldCheck, ShoppingBag, ShoppingCart, User, X } from 'lucide-react';
+import { Calendar, Cpu, Download, Eye, EyeOff, FileText, Filter, Leaf, Mail, MapPin, Mic, Minus, Phone, Plus, Printer, Search as SearchIcon, ShieldCheck, ShoppingBag, ShoppingCart, User, X } from 'lucide-react';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { orderAPI, productAPI, profileAPI } from '../services/api';
+import BuyerChat from './BuyerChat';
 import LiveTracking from './LiveTracking';
 import Profile from './Profile';
 
@@ -114,6 +115,7 @@ const BuyerDashboard = () => {
     const [paymentMethod, setPaymentMethod] = useState('upi');
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState<any>(null);
+    const [showAIChat, setShowAIChat] = useState(false);
 
     const categoryKeys = ['vegetables', 'fruits', 'grains', 'pulses', 'oil_seeds', 'spices'];
 
@@ -1036,7 +1038,9 @@ const BuyerDashboard = () => {
                 {orderSuccess && (
                     <>
                         <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
                             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', zIndex: 1100 }}
                         />
                         <motion.div
@@ -1080,7 +1084,69 @@ const BuyerDashboard = () => {
                 )}
             </AnimatePresence>
 
-        </div >
+            {/* AI Assistant Floating Button */}
+            {!showAIChat && (
+                <motion.button
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowAIChat(true)}
+                    style={{
+                        position: 'fixed',
+                        bottom: '2rem',
+                        right: '2rem',
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '20px',
+                        background: 'linear-gradient(135deg, #4285F4 0%, #34A853 100%)',
+                        color: 'white',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 10px 25px rgba(66, 133, 244, 0.4)',
+                        zIndex: 999
+                    }}
+                >
+                    <Cpu size={32} />
+                    <div style={{
+                        position: 'absolute',
+                        top: '-5px',
+                        right: '-5px',
+                        background: 'var(--primary)',
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        border: '2px solid var(--background)',
+                        animation: 'pulse 2s infinite'
+                    }} />
+                </motion.button>
+            )}
+
+            {/* AI Chat Drawer/Modal */}
+            <AnimatePresence>
+                {showAIChat && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowAIChat(false)}
+                            style={{
+                                position: 'fixed',
+                                inset: 0,
+                                background: 'rgba(0,0,0,0.4)',
+                                backdropFilter: 'blur(4px)',
+                                zIndex: 998
+                            }}
+                        />
+                        <BuyerChat onClose={() => setShowAIChat(false)} />
+                    </>
+                )}
+            </AnimatePresence>
+        </div>
     );
 };
 
