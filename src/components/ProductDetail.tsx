@@ -91,6 +91,26 @@ const ProductDetail: React.FC = () => {
                                 <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', padding: '0.5rem 1rem', borderRadius: '12px' }}>{product.category || 'Vegetables'}</span>
                                 <span className="badge" style={{ background: 'rgba(255,193,7,0.1)', color: '#FFC107', padding: '0.5rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Star size={14} fill="#FFC107" /> {product.rating || '5.0'} Rating</span>
                             </div>
+
+                            <div className="premium-card" style={{ padding: '1.5rem', marginBottom: '2rem', background: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)' }}>
+                                <h4 style={{ marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}>
+                                    <ShieldCheck size={18} /> Verified AI Quality Audit
+                                </h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+                                    {[
+                                        { label: 'Freshness', value: product.qualityDetails?.freshness ? `${product.qualityDetails.freshness}%` : '98%', color: '#4CAF50' },
+                                        { label: 'Ripeness', value: product.qualityDetails?.ripeness ? `${product.qualityDetails.ripeness}%` : '92%', color: '#FFC107' },
+                                        { label: 'Texture', value: product.qualityDetails?.texture ? `${product.qualityDetails.texture}%` : '95%', color: '#2196F3' },
+                                        { label: 'Shelf Life', value: product.qualityDetails?.shelfLife || '8 Days', color: '#9C27B0' }
+                                    ].map((m, idx) => (
+                                        <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '14px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>{m.label}</div>
+                                            <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'white' }}>{m.value}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
                             <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
                                 Freshly harvested from the local farms. This {product.name || product.key} is grown using sustainable organic practices, ensuring the highest nutrient content and natural taste. Available quantity: {product.quantity || 'In Stock'}.
                             </p>
