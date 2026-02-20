@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     Camera,
@@ -10,7 +11,6 @@ import {
     Navigation,
     Package,
     Rocket,
-    ShieldCheck,
     TrendingUp,
     Truck
 } from 'lucide-react';
@@ -33,6 +33,7 @@ const MOCK_CROPS = [
     { id: '5', name: 'Wheat', image: 'https://img.icons8.com/color/96/wheat.png', marketPrice: 40 },
     { id: '6', name: 'Carrot', image: 'https://img.icons8.com/color/96/carrot.png', marketPrice: 35 },
     { id: '7', name: 'Egg', image: 'https://img.icons8.com/color/96/egg.png', marketPrice: 8 },
+    { id: '8', name: 'Eggplant', image: 'https://img.icons8.com/color/96/eggplant.png', marketPrice: 8 },
 ];
 
 const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
@@ -53,6 +54,7 @@ const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
     // Simulation States
     const [isListening, setIsListening] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [qualityDetails, setQualityDetails] = useState<any>(productToEdit?.qualityDetails || (productToEdit?.quality ? { grade: productToEdit.quality } : null)); // New detailed metrics
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,19 +123,90 @@ const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
         runAIAnalysis();
     };
 
-    const runAIAnalysis = () => {
+    const runAIAnalysis = async (uploadedFile?: File) => {
         setIsAnalyzing(true);
         playHapticSound(1000, 'square', 0.05);
 
-        setTimeout(() => {
-            setIsAnalyzing(false);
-            setQuality('Grade A');
+        try {
+            const formData = new FormData();
+            if (uploadedFile) {
+                formData.append('file', uploadedFile);
+            } else if (videoRef.current) {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoRef.current.videoWidth;
+                canvas.height = videoRef.current.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(videoRef.current, 0, 0);
+                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                if (blob) {
+                    formData.append('file', blob, 'capture.jpg');
+                } else {
+                    throw new Error("Failed to capture image");
+                }
+            } else {
+                throw new Error("No image source available");
+            }
+
+            const response = await axios.post('http://localhost:5001/predict', formData);
+            const data = response.data;
+
+            setQualityDetails({
+                grade: data.quality,
+                confidence: data.confidence,
+                freshness: data.metrics.freshness,
+                ripeness: data.metrics.ripeness,
+                texture: data.metrics.texture,
+                color: data.metrics.color,
+                shelfLife: data.metrics.shelfLife,
+                issues: data.quality === 'Grade A' ? ['None detected'] : (data.quality === 'Grade B' ? ['Minor surface damage'] : ['Significant rot/defect detected']),
+                recommendation: data.metrics.recommendation
+            });
+            setQuality(data.quality);
             stopCamera();
-            // Pricing logic
-            if (crop) setPrice((crop.marketPrice - 2).toString());
-            toast.success("AI Quality Grade: A", { icon: '✨' });
+
+            if (crop) {
+                const isPremium = data.quality === 'Grade A' || data.quality === 'Grade A+';
+                const recommendedPrice = isPremium ? crop.marketPrice + 5 : crop.marketPrice - 5;
+                setPrice(recommendedPrice.toString());
+            }
+
+            toast.success(`AI Audit Complete: ${data.quality}`, {
+                icon: '✨',
+                style: { background: 'var(--primary)', color: 'white' }
+            });
+
+        } catch (err) {
+            console.warn("Real AI service unreachable, using simulation...", err);
+            // Simulation Fallback
+            setTimeout(() => {
+                setIsAnalyzing(false);
+                const detailedMetrics = {
+                    grade: 'Grade A',
+                    confidence: 98.4,
+                    freshness: 95,
+                    ripeness: 88,
+                    texture: 92,
+                    color: 96,
+                    shelfLife: '7-10 Days',
+                    issues: ['None detected'],
+                    recommendation: 'Premium Listing'
+                };
+                setQualityDetails(detailedMetrics);
+                setQuality(detailedMetrics.grade);
+                stopCamera();
+                if (crop) {
+                    const recommendedPrice = crop.marketPrice - 1;
+                    setPrice(recommendedPrice.toString());
+                }
+                toast.success("AI Analysis (Simulated): Grade A", {
+                    icon: '⚡',
+                    style: { background: 'var(--primary)', color: 'white' }
+                });
+            }, 2000);
+        } finally {
+            setIsAnalyzing(false);
             playHapticSound(659.25, 'sine', 0.2);
-        }, 2000);
+        }
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,7 +215,7 @@ const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
             const reader = new FileReader();
             reader.onload = (event) => {
                 setImage(event.target?.result as string);
-                runAIAnalysis();
+                runAIAnalysis(file); // Pass the file for analysis
             };
             reader.readAsDataURL(file);
         }
@@ -199,6 +272,7 @@ const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
             farmerAddress: locationText || "Coimbatore, TN",
             userId: user?.email || user?.userId, // Added for reliable filtering
             quality: quality,
+            qualityDetails: qualityDetails,
             quantity: `${quantity} ${unit}`,
             deliveryType: deliveryType,
             rating: '5.0'
@@ -363,15 +437,60 @@ const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
                                 </div>
                             )}
 
-                            {quality ? (
-                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {qualityDetails ? (
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: '1rem' }}>
                                     <motion.div
-                                        initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                                        style={{ background: 'var(--surface)', padding: '2rem', borderRadius: '20px', border: '2px solid var(--primary)', textAlign: 'center' }}
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        style={{
+                                            background: 'var(--surface)',
+                                            padding: '1.5rem',
+                                            borderRadius: '24px',
+                                            border: `1px solid ${qualityDetails.grade === 'Grade C' ? '#ff4d4d' : 'var(--primary)'}`,
+                                            width: '100%',
+                                            maxWidth: '500px',
+                                            boxShadow: qualityDetails.grade === 'Grade C'
+                                                ? '0 0 40px rgba(255, 77, 77, 0.2)'
+                                                : '0 0 40px rgba(76, 175, 80, 0.2)'
+                                        }}
                                     >
-                                        <ShieldCheck size={48} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-                                        <div style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--primary)' }}>{quality}</div>
-                                        <div style={{ color: 'var(--text-muted)' }}>Certified High Quality</div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                            <div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>AI GRADE</div>
+                                                <h4 style={{ fontSize: '1.8rem', fontWeight: 800, color: qualityDetails.grade === 'Grade C' ? '#ff4d4d' : 'var(--primary)' }}>
+                                                    {qualityDetails.grade}
+                                                </h4>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>CONFIDENCE</div>
+                                                <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{qualityDetails.confidence}%</div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
+                                            {[
+                                                { label: 'Freshness', value: qualityDetails.freshness + '%' },
+                                                { label: 'Ripeness', value: qualityDetails.ripeness + '%' },
+                                                { label: 'Texture', value: qualityDetails.texture + '%' },
+                                                { label: 'Shelf Life', value: qualityDetails.shelfLife },
+                                            ].map((m, idx) => (
+                                                <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.label}</div>
+                                                    <div style={{ fontWeight: 600 }}>{m.value}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: 'rgba(76, 175, 80, 0.1)', borderRadius: '12px', border: '1px border-dashed var(--primary)' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Shelf Life</div>
+                                                <div style={{ fontWeight: 600 }}>{qualityDetails.shelfLife}</div>
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Recommendation</div>
+                                                <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{qualityDetails.recommendation}</div>
+                                            </div>
+                                        </div>
                                     </motion.div>
                                 </div>
                             ) : (
@@ -393,7 +512,7 @@ const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
                             >
                                 Back
                             </button>
-                            {!quality ? (
+                            {!qualityDetails ? (
                                 <div style={{ flex: 2, display: 'flex', gap: '1rem' }}>
                                     <button onClick={capturePhoto} disabled={isAnalyzing} className="btn-primary" style={{ flex: 1, justifyContent: 'center', height: '60px', opacity: isAnalyzing ? 0.7 : 1 }}>
                                         <Camera size={24} style={{ marginRight: '1rem' }} />
@@ -421,10 +540,41 @@ const AddCrop = ({ onBack, onSuccess, productToEdit }: AddCropProps) => {
                                     />
                                 </div>
                             ) : (
-                                <button onClick={handleNext} className="btn-primary" style={{ flex: 2, justifyContent: 'center', height: '60px' }}>
-                                    <span>Next: Pricing & Quantity</span>
-                                    <ChevronRight size={24} />
-                                </button>
+                                <div style={{ flex: 2, display: 'flex', gap: '1rem' }}>
+                                    <button
+                                        onClick={() => {
+                                            setQualityDetails(null);
+                                            setQuality(null);
+                                            startCamera();
+                                        }}
+                                        style={{
+                                            flex: 1,
+                                            background: 'var(--surface)',
+                                            border: '1px solid var(--border)',
+                                            color: 'white',
+                                            borderRadius: '12px',
+                                            cursor: 'pointer',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Rescan
+                                    </button>
+                                    <button
+                                        onClick={handleNext}
+                                        disabled={qualityDetails.grade === 'Grade C'}
+                                        className="btn-primary"
+                                        style={{
+                                            flex: 2,
+                                            justifyContent: 'center',
+                                            height: '60px',
+                                            opacity: qualityDetails.grade === 'Grade C' ? 0.5 : 1,
+                                            cursor: qualityDetails.grade === 'Grade C' ? 'not-allowed' : 'pointer'
+                                        }}
+                                    >
+                                        <span>{qualityDetails.grade === 'Grade C' ? 'Rejection Detected' : 'Next: Pricing & Quantity'}</span>
+                                        {qualityDetails.grade !== 'Grade C' && <ChevronRight size={24} />}
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </motion.div>

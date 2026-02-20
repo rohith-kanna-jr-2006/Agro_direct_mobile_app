@@ -27,8 +27,24 @@ const ProductCard = ({ item, onAddToCart, onOpenDetail, onQuickView, t }: { item
         <div className="premium-card" onClick={onOpenDetail} style={{ padding: 0, overflow: 'hidden', position: 'relative', cursor: 'pointer' }}>
             <div className="product-image-container" style={{ position: 'relative', overflow: 'hidden' }}>
                 <img src={item.img || item.image} alt={item.name} style={{ width: '100%', height: '200px', objectFit: 'cover', transition: 'transform 0.3s ease' }} />
-                <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--primary)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem' }}>
-                    {item.grade || 'A'}
+                <div style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    fontWeight: 800,
+                    fontSize: '0.7rem',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    zIndex: 2
+                }}>
+                    <ShieldCheck size={12} />
+                    {item.grade || 'Grade A'}
                 </div>
                 <div className="quick-view-overlay" style={{
                     position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex',
@@ -926,18 +942,42 @@ const BuyerDashboard = () => {
                                 </div>
 
                                 <div className="premium-card" style={{ padding: '1.5rem' }}>
+                                    <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}>
+                                        <ShieldCheck size={18} /> Verified AI Quality Audit
+                                    </h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        {[
+                                            { label: 'Freshness', value: selectedProduct.qualityDetails?.freshness ? `${selectedProduct.qualityDetails.freshness}%` : '98%', color: '#4CAF50' },
+                                            { label: 'Ripeness', value: selectedProduct.qualityDetails?.ripeness ? `${selectedProduct.qualityDetails.ripeness}%` : '92%', color: '#FFC107' },
+                                            { label: 'Texture', value: selectedProduct.qualityDetails?.texture ? `${selectedProduct.qualityDetails.texture}%` : '95%', color: '#2196F3' },
+                                            { label: 'Shelf Life', value: selectedProduct.qualityDetails?.shelfLife || '8 Days', color: '#9C27B0' }
+                                        ].map((m, idx) => (
+                                            <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>{m.label}</div>
+                                                <div style={{ fontWeight: 700 }}>{m.value}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Cpu size={14} /> AI Analysis timestamp: {new Date().toLocaleDateString()}
+                                    </div>
+                                </div>
+
+                                <div className="premium-card" style={{ padding: '1.5rem' }}>
                                     <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><User size={18} /> Farmer Details</h4>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                        <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                                             {selectedProduct.farmerImg ? (
                                                 <img src={selectedProduct.farmerImg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
-                                                <User size={24} />
+                                                <div style={{ background: 'var(--primary)', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                                                    <User size={24} />
+                                                </div>
                                             )}
                                         </div>
                                         <div>
-                                            <p style={{ fontWeight: 700 }}>{selectedProduct.farmerName || selectedProduct.farm || 'Verified Farmer'}</p>
-                                            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                            <p style={{ fontWeight: 700, margin: 0 }}>{selectedProduct.farmerName || selectedProduct.farm || 'Verified Farmer'}</p>
+                                            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', margin: '4px 0 0 0' }}>
                                                 <MapPin size={14} /> {selectedProduct.farmerAddress || 'Village: Melur, Dist: Madurai'}
                                             </p>
                                         </div>

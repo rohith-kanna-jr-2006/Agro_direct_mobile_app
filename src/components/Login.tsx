@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { authAPI } from '../services/api';
 
 
 const Login = () => {
@@ -26,6 +27,8 @@ const Login = () => {
     const [showMfa, setShowMfa] = useState(false);
     const [mfaIdentifier, setMfaIdentifier] = useState('');
     const [mfaCode, setMfaCode] = useState('');
+    const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
+    const [usernameCheckLoading, setUsernameCheckLoading] = useState(false);
 
     useEffect(() => {
         const roleParam = searchParams.get('role');
@@ -39,6 +42,26 @@ const Login = () => {
         console.log(`[Login] Role selected: ${r}`);
         setRole(r);
         setStep(1);
+    };
+
+    const checkUsernameAvailability = async (username: string) => {
+        if (!username || username.length < 3) {
+            setIsUsernameAvailable(null);
+            return;
+        }
+        setUsernameCheckLoading(true);
+        try {
+            const response = await authAPI.checkUsername(username);
+            setIsUsernameAvailable(response.data.available);
+            if (!response.data.available) {
+                toast.error("Username is already taken");
+            }
+        } catch (error) {
+            console.error("Username check failed", error);
+            setIsUsernameAvailable(null);
+        } finally {
+            setUsernameCheckLoading(false);
+        }
     };
 
     const handleTraditionalSubmit = async (e: React.FormEvent) => {
@@ -396,8 +419,35 @@ const Login = () => {
                                                             placeholder="Username"
                                                             required
                                                             value={formData.username}
-                                                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                                            onChange={(e) => {
+                                                                setFormData({ ...formData, username: e.target.value });
+                                                                setIsUsernameAvailable(null); // Reset on change
+                                                            }}
+                                                            onBlur={() => checkUsernameAvailability(formData.username)}
+                                                            style={{
+                                                                borderColor: isUsernameAvailable === false ? 'red' : isUsernameAvailable === true ? 'green' : undefined
+                                                            }}
                                                         />
+                                                        {usernameCheckLoading && (
+                                                            <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }}>
+                                                                <motion.div
+                                                                    animate={{ rotate: 360 }}
+                                                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                                                >
+                                                                    <Sprout size={16} color="var(--primary)" />
+                                                                </motion.div>
+                                                            </div>
+                                                        )}
+                                                        {!usernameCheckLoading && isUsernameAvailable === false && (
+                                                            <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'red', fontSize: '0.8rem' }}>
+                                                                Taken
+                                                            </div>
+                                                        )}
+                                                        {!usernameCheckLoading && isUsernameAvailable === true && (
+                                                            <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'green', fontSize: '0.8rem' }}>
+                                                                Available
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
@@ -481,7 +531,7 @@ const Login = () => {
 
                                             <button
                                                 type="submit"
-                                                disabled={isSubmitting}
+                                                disabled={isSubmitting || (isSignup && isUsernameAvailable === false)}
                                                 className="btn-primary"
                                                 style={{ justifyContent: 'center', padding: '1rem', marginTop: '0.5rem', width: '100%' }}
                                             >

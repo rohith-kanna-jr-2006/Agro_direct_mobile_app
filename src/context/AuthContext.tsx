@@ -334,7 +334,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error("Registration failed:", err);
             if (err.response?.status === 409) {
                 // Show specific 409 error message
-                toast.error("Already registered email, please signup with another email id.");
+                toast.error(err.response?.data?.error || "Username or email already exists.");
             } else {
                 toast.error(err.response?.data?.error || "Registration failed");
             }
